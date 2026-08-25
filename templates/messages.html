@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}留言 · 橘語{% endblock %}
+{% block content %}
+
+<div class="message-thread">
+  {% for m in messages %}
+  <div class="msg-row {{ 'me' if m['sender_id'] == me_id else 'them' }}">
+    <div class="msg-bubble">
+      {% if m['image_filename'] %}
+      <img src="{{ url_for('static', filename='uploads/' ~ m['image_filename']) }}" class="msg-image">
+      {% endif %}
+      {% if m['text'] %}<p>{{ m['text'] }}</p>{% endif %}
+      <span class="msg-time">{{ m['created_at'][5:16] }}</span>
+    </div>
+  </div>
+  {% else %}
+  <p class="empty-hint">還沒有留言，跟對方說句話吧</p>
+  {% endfor %}
+</div>
+
+<form action="{{ url_for('messages') }}" method="post" enctype="multipart/form-data" class="message-input-bar">
+  <label class="upload-btn">
+    <i class="ti ti-photo"></i>
+    <input type="file" name="image" accept="image/*" hidden>
+  </label>
+  <input type="text" name="text" placeholder="留言給對方...">
+  <button type="submit"><i class="ti ti-send"></i></button>
+</form>
+
+{% endblock %}

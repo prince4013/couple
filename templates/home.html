@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}首頁 · 橘語{% endblock %}
+{% block content %}
+
+<div class="card partner-card">
+  <div class="avatar" style="background:{{ partner['avatar_color'] }}">{{ partner['name'][0] }}</div>
+  <div class="partner-info">
+    <p class="partner-name">{{ partner['name'] }} · {{ partner['city'] }} {{ partner_time }}</p>
+    <p class="partner-weather"><i class="ti ti-cloud"></i> {{ partner['weather'] or '尚未更新天氣' }}</p>
+  </div>
+  <span class="status-pill">{{ partner['status'] or '尚未更新狀態' }}</span>
+</div>
+
+<form action="{{ url_for('send_gift', gift_type='miss_you') }}" method="post">
+  <button type="submit" class="miss-you-btn" onclick="try{navigator.vibrate([200,100,200])}catch(e){}">
+    <i class="ti ti-heart"></i> 想你了，震一下對方
+  </button>
+</form>
+
+<div class="countdown-card">
+  <p class="countdown-label">距離見面還有</p>
+  {% if days_left is not none %}
+    <p class="countdown-days">{{ days_left }} <span>天</span></p>
+    <p class="countdown-date">{{ meeting_date }} 見面</p>
+  {% else %}
+    <p class="countdown-days">--</p>
+    <p class="countdown-date">尚未設定見面日期，請到設定頁新增</p>
+  {% endif %}
+</div>
+
+<div class="gift-row">
+  {% for gtype, (label, icon) in gift_labels.items() if gtype != 'miss_you' %}
+  <form action="{{ url_for('send_gift', gift_type=gtype) }}" method="post" class="gift-form">
+    <button type="submit" class="gift-btn">
+      <i class="ti {{ icon }}"></i>
+      <span>{{ label }}</span>
+    </button>
+  </form>
+  {% endfor %}
+</div>
+
+{% if latest_question %}
+<a href="{{ url_for('question_thread', qid=latest_question['id']) }}" class="question-preview">
+  <i class="ti ti-message-2-question"></i>
+  <div class="question-preview-text">
+    <p class="q-label">最新小問題</p>
+    <p class="q-text">{{ latest_question['question_text'] }}</p>
+  </div>
+  <i class="ti ti-chevron-right"></i>
+</a>
+{% endif %}
+
+<div class="card status-form">
+  <p class="section-label">更新我的狀態</p>
+  <form action="{{ url_for('update_status') }}" method="post" class="status-form-inner">
+    <select name="status">
+      <option value="">選擇狀態</option>
+      {% for s in status_options %}
+      <option value="{{ s }}" {{ 'selected' if s == me['status'] else '' }}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <input type="text" name="weather" placeholder="今天天氣，例如 26°C 晴" value="{{ me['weather'] }}">
+    <button type="submit">更新</button>
+  </form>
+</div>
+
+{% if recent_gifts %}
+<div class="card gift-feed">
+  <p class="section-label">最近的禮物</p>
+  {% for gft in recent_gifts %}
+  <div class="gift-feed-item">
+    <i class="ti {{ gift_labels[gft['gift_type']][1] }}"></i>
+    <span>{{ 'Alex' if gft['sender_id']=='b' else '美' }} 送出了「{{ gift_labels[gft['gift_type']][0] }}」</span>
+    <span class="gift-time">{{ gft['created_at'][5:16] }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

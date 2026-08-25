@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}小問題對話串 · 橘語{% endblock %}
+{% block content %}
+
+<a href="{{ url_for('questions') }}" class="back-link"><i class="ti ti-chevron-left"></i> 所有小問題</a>
+
+<div class="card question-card">
+  <p class="q-meta">{{ 'Alex' if question['asker_id']=='b' else '美' }} 提問 · {{ question['created_at'][5:16] }}</p>
+  <p class="question-main-text">{{ question['question_text'] }}</p>
+</div>
+
+<div class="message-thread">
+  {% for r in replies %}
+  <div class="msg-row {{ 'me' if r['sender_id'] == me_id else 'them' }}">
+    <div class="msg-bubble">
+      <p>{{ r['reply_text'] }}</p>
+      <span class="msg-time">{{ r['created_at'][5:16] }}</span>
+    </div>
+  </div>
+  {% else %}
+  <p class="empty-hint">還沒有人回覆這個問題</p>
+  {% endfor %}
+</div>
+
+<form action="{{ url_for('question_thread', qid=question['id']) }}" method="post" class="message-input-bar">
+  <input type="text" name="reply_text" placeholder="回覆這個問題...">
+  <button type="submit"><i class="ti ti-send"></i></button>
+</form>
+
+{% endblock %}

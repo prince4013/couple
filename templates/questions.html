@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}小問題 · 橘語{% endblock %}
+{% block content %}
+
+<div class="card">
+  <p class="section-label">問對方一個小問題</p>
+  <form action="{{ url_for('new_question') }}" method="post" class="new-question-form">
+    <input type="text" name="question_text" placeholder="例如：最近讓你最有安全感的一件事？" required>
+    <button type="submit">提問</button>
+  </form>
+</div>
+
+<div class="thread-list">
+  {% for t in threads %}
+  <a href="{{ url_for('question_thread', qid=t['id']) }}" class="thread-item">
+    <i class="ti ti-message-2-question"></i>
+    <div class="thread-item-text">
+      <p class="q-text">{{ t['question_text'] }}</p>
+      <p class="q-meta">{{ 'Alex' if t['asker_id']=='b' else '美' }} 提問 · {{ t['reply_count'] }} 則回覆</p>
+    </div>
+    <i class="ti ti-chevron-right"></i>
+  </a>
+  {% else %}
+  <p class="empty-hint">還沒有小問題，先問對方一個吧</p>
+  {% endfor %}
+</div>
+
+{% endblock %}

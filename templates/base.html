@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}橘語 · 遠距情侶{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+</head>
+<body>
+<div class="phone">
+
+  <div class="statusbar">
+    <span>{{ now_display if now_display else '' }}</span>
+    <div class="identity-switch">
+      目前身分：
+      <a href="{{ url_for('switch', uid='a') }}" class="{{ 'active' if me_id=='a' else '' }}">美</a> /
+      <a href="{{ url_for('switch', uid='b') }}" class="{{ 'active' if me_id=='b' else '' }}">Alex</a>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div class="flash">
+        {% for m in messages %}<div>{{ m }}</div>{% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <nav class="bottom-nav">
+    <a href="{{ url_for('home') }}" class="{{ 'active' if request.endpoint=='home' else '' }}">
+      <i class="ti ti-home"></i><span>首頁</span>
+    </a>
+    <a href="{{ url_for('messages') }}" class="{{ 'active' if request.endpoint=='messages' else '' }}">
+      <i class="ti ti-message-circle"></i><span>留言</span>
+    </a>
+    <a href="{{ url_for('questions') }}" class="{{ 'active' if request.endpoint in ['questions','question_thread'] else '' }}">
+      <i class="ti ti-message-2-question"></i><span>小問題</span>
+    </a>
+    <a href="{{ url_for('checklist') }}" class="{{ 'active' if request.endpoint=='checklist' else '' }}">
+      <i class="ti ti-checklist"></i><span>清單</span>
+    </a>
+    <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' else '' }}">
+      <i class="ti ti-settings"></i><span>設定</span>
+    </a>
+  </nav>
+
+</div>
+</body>
+</html>
