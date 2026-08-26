@@ -12,8 +12,8 @@
 </div>
 
 <form action="{{ url_for('send_gift', gift_type='miss_you') }}" method="post">
-  <button type="submit" class="miss-you-btn" onclick="try{navigator.vibrate([200,100,200])}catch(e){}">
-    <i class="ti ti-heart"></i> 想你了，震一下對方
+  <button type="submit" class="miss-you-btn">
+    <i class="ti ti-heart"></i> 想你了
   </button>
 </form>
 
@@ -55,11 +55,29 @@
   <form action="{{ url_for('update_status') }}" method="post" class="status-form-inner">
     <select name="status">
       <option value="">選擇狀態</option>
-      {% for s in status_options %}
-      <option value="{{ s }}" {{ 'selected' if s == me['status'] else '' }}>{{ s }}</option>
+      {% for opt in status_options %}
+      <option value="{{ opt['label'] }}" {{ 'selected' if opt['label'] == me['status'] else '' }}>{{ opt['label'] }}</option>
       {% endfor %}
     </select>
     <button type="submit">更新</button>
+  </form>
+
+  <p class="section-label" style="margin-top:12px;">管理狀態選項</p>
+  <div class="status-chip-list">
+    {% for opt in status_options %}
+    <span class="status-chip">
+      {{ opt['label'] }}
+      <form action="{{ url_for('delete_status_option', option_id=opt['id']) }}" method="post" class="chip-delete-form">
+        <button type="submit"><i class="ti ti-x"></i></button>
+      </form>
+    </span>
+    {% else %}
+    <span class="empty-hint" style="margin:4px 0;">還沒有狀態選項</span>
+    {% endfor %}
+  </div>
+  <form action="{{ url_for('add_status_option') }}" method="post" class="add-item-form">
+    <input type="text" name="label" placeholder="新增狀態選項">
+    <button type="submit"><i class="ti ti-plus"></i></button>
   </form>
 </div>
 

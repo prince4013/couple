@@ -116,6 +116,18 @@ body {
   font-size: 13px; cursor: pointer;
 }
 
+.status-chip-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.status-chip {
+  display: flex; align-items: center; gap: 4px;
+  background: #F5EFE0; border: 1px solid #F0E3C8; border-radius: 999px;
+  padding: 4px 6px 4px 10px; font-size: 12px; color: #412402;
+}
+.chip-delete-form { display: flex; }
+.chip-delete-form button {
+  border: none; background: transparent; cursor: pointer; padding: 2px; display: flex; color: #B4B2A9;
+}
+.chip-delete-form button i { font-size: 12px; }
+
 .gift-feed-item {
   display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 6px 0;
   border-top: 1px solid #F5EFE0;

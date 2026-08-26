@@ -29,13 +29,11 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
 app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024  # 8MB 上限
 
-FEMALE_STATUSES = ["開心", "沒睡好", "祕書長好煩", "想你", "麵今天不乖", "工作好多"]
-MALE_STATUSES = ["開心", "累", "想你", "好多功課"]
-
 GIFT_LABELS = {
     "heart": ("愛心", "ti-heart"),
     "cake": ("蛋糕", "ti-cake"),
     "coffee": ("咖啡", "ti-coffee"),
+    "bouquet": ("花束", "ti-flower"),
     "miss_you": ("想你了", "ti-heart-filled"),
 }
 
@@ -172,6 +170,14 @@ def init_db():
             created_at TEXT NOT NULL
         )
         """,
+        f"""
+        CREATE TABLE IF NOT EXISTS status_options (
+            id {id_type},
+            gender TEXT NOT NULL,
+            label TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """,
         """
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
@@ -213,6 +219,19 @@ def init_db():
                 "place", "下北澤選物咖啡廳", 0, ts,
                 "place", "江之島看夕陽", 0, ts,
             ),
+        )
+
+        female_defaults = ["開心", "沒睡好", "祕書長好煩", "想你", "麵今天不乖", "工作好多"]
+        male_defaults = ["開心", "累", "想你", "好多功課"]
+        status_rows = [("f", label) for label in female_defaults] + [("m", label) for label in male_defaults]
+        status_params = []
+        for gender, label in status_rows:
+            status_params.extend([gender, label, ts])
+        row3 = "(" + ",".join([ph] * 3) + ")"
+        status_values_sql = ",".join([row3] * len(status_rows))
+        cur.execute(
+            f"INSERT INTO status_options (gender, label, created_at) VALUES {status_values_sql}",
+            tuple(status_params),
         )
         conn.commit()
 
@@ -349,7 +368,9 @@ def home():
     recent_gifts = run(db, "SELECT * FROM gifts ORDER BY id DESC LIMIT 5").fetchall()
     latest_question = run(db, "SELECT * FROM questions ORDER BY id DESC LIMIT 1").fetchone()
 
-    status_options = FEMALE_STATUSES if me["gender"] == "f" else MALE_STATUSES
+    status_options = run(
+        db, "SELECT * FROM status_options WHERE gender = ? ORDER BY id ASC", (me["gender"],)
+    ).fetchall()
 
     return render_template(
         "home.html",
@@ -372,6 +393,29 @@ def update_status():
     run(db, "UPDATE users SET status = ? WHERE id = ?", (status, current_user_id()))
     db.commit()
     flash("已更新你的狀態")
+    return redirect(url_for("home"))
+
+
+@app.route("/status_options/add", methods=["POST"])
+def add_status_option():
+    label = request.form.get("label", "").strip()
+    if label:
+        me = fetch_user(current_user_id())
+        db = get_db()
+        run(
+            db,
+            "INSERT INTO status_options (gender, label, created_at) VALUES (?, ?, ?)",
+            (me["gender"], label, now_str()),
+        )
+        db.commit()
+    return redirect(url_for("home"))
+
+
+@app.route("/status_options/delete/<int:option_id>", methods=["POST"])
+def delete_status_option(option_id):
+    db = get_db()
+    run(db, "DELETE FROM status_options WHERE id = ?", (option_id,))
+    db.commit()
     return redirect(url_for("home"))
 
 
