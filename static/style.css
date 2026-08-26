@@ -227,6 +227,12 @@ body {
   color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
 }
 
+.danger-btn {
+  width: 100%; padding: 11px; border-radius: 12px; cursor: pointer;
+  background: #fff; border: 1px solid #C0392B; color: #C0392B;
+  font-size: 14px; font-weight: 700;
+}
+
 .bottom-nav {
   position: sticky; bottom: 0;
   display: flex; justify-content: space-around; align-items: center;

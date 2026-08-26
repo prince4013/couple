@@ -26,4 +26,15 @@
   <button type="submit" class="save-btn">儲存設定</button>
 </form>
 
+<div class="card">
+  <p class="section-label">資料清除</p>
+  <form
+    action="{{ url_for('clear_gifts') }}"
+    method="post"
+    onsubmit="return confirm('確定要清除所有「最近的禮物」記錄嗎？這個動作無法復原。');"
+  >
+    <button type="submit" class="danger-btn">清除「最近的禮物」記錄</button>
+  </form>
+</div>
+
 {% endblock %}

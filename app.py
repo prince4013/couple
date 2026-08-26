@@ -436,6 +436,15 @@ def send_gift(gift_type):
     return redirect(url_for("home"))
 
 
+@app.route("/gifts/clear", methods=["POST"])
+def clear_gifts():
+    db = get_db()
+    run(db, "DELETE FROM gifts")
+    db.commit()
+    flash("已清除「最近的禮物」記錄")
+    return redirect(url_for("settings"))
+
+
 @app.route("/messages", methods=["GET", "POST"])
 def messages():
     if request.method == "POST":

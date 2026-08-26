@@ -12,7 +12,7 @@
 </div>
 
 <form action="{{ url_for('send_gift', gift_type='miss_you') }}" method="post">
-  <button type="submit" class="miss-you-btn">
+  <button type="submit" class="miss-you-btn" onclick="try{navigator.vibrate([200,100,200])}catch(e){}">
     <i class="ti ti-heart"></i> 想你了
   </button>
 </form>
