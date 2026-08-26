@@ -45,23 +45,23 @@
   </main>
 
   <nav class="bottom-nav">
-    <a href="{{ url_for('home') }}" class="{{ 'active' if request.endpoint=='home' else '' }}">
-      <i class="ti ti-home"></i><span>首頁</span>
+    <a href="{{ url_for('questions') }}" class="{{ 'active' if request.endpoint in ['questions','question_thread'] else '' }}">
+      <i class="ti ti-message-2-question"></i><span>小問題</span>
     </a>
     <a href="{{ url_for('messages') }}" class="{{ 'active' if request.endpoint=='messages' else '' }}">
       <i class="ti ti-message-circle"></i><span>留言</span>
     </a>
-    <a href="{{ url_for('questions') }}" class="{{ 'active' if request.endpoint in ['questions','question_thread'] else '' }}">
-      <i class="ti ti-message-2-question"></i><span>小問題</span>
+    <a href="{{ url_for('blog') }}" class="{{ 'active' if request.endpoint=='blog' else '' }}">
+      <i class="ti ti-news"></i><span>動態</span>
     </a>
-    <a href="{{ url_for('checklist') }}" class="{{ 'active' if request.endpoint=='checklist' else '' }}">
-      <i class="ti ti-checklist"></i><span>清單</span>
+    <a href="{{ url_for('home') }}" class="{{ 'active' if request.endpoint=='home' else '' }}">
+      <i class="ti ti-home"></i><span>首頁</span>
     </a>
     <a href="{{ url_for('memories') }}" class="{{ 'active' if request.endpoint=='memories' else '' }}">
       <i class="ti ti-photo"></i><span>回憶</span>
     </a>
-    <a href="{{ url_for('blog') }}" class="{{ 'active' if request.endpoint=='blog' else '' }}">
-      <i class="ti ti-news"></i><span>動態</span>
+    <a href="{{ url_for('checklist') }}" class="{{ 'active' if request.endpoint=='checklist' else '' }}">
+      <i class="ti ti-checklist"></i><span>清單</span>
     </a>
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' else '' }}">
       <i class="ti ti-settings"></i><span>設定</span>
