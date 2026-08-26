@@ -15,7 +15,7 @@
     </label>
     <img id="blog-preview" class="memory-preview" style="display:none;" alt="照片預覽">
 
-    <input type="url" name="youtube_url" placeholder="貼上 YouTube 連結（選填）">
+    <input type="url" name="link_url" placeholder="貼上連結（YouTube、Threads...都可以，選填）">
 
     <button type="submit" class="save-btn">發佈</button>
   </form>
@@ -62,17 +62,28 @@ function previewBlogImage(event) {
     <img src="{{ post['image_url'] }}" class="blog-image" alt="貼文照片">
     {% endif %}
 
-    {% if post['youtube_url'] %}
-    <a href="{{ post['youtube_url'] }}" target="_blank" rel="noopener" class="yt-preview">
-      <div class="yt-thumb-wrap">
-        {% if post['youtube_thumbnail'] %}
-        <img src="{{ post['youtube_thumbnail'] }}" class="yt-thumb" alt="YouTube 縮圖">
+    {% if post.preview_url %}
+    <a href="{{ post.preview_url }}" target="_blank" rel="noopener" class="link-preview">
+      <div class="link-thumb-wrap">
+        {% if post.preview_thumbnail %}
+        <img src="{{ post.preview_thumbnail }}" class="link-thumb" alt="連結預覽圖">
+        {% else %}
+        <span class="link-thumb-fallback"><i class="ti ti-link"></i></span>
         {% endif %}
-        <span class="yt-play-icon"><i class="ti ti-player-play-filled"></i></span>
+        {% if post.preview_is_youtube %}
+        <span class="link-play-icon"><i class="ti ti-player-play-filled"></i></span>
+        {% endif %}
       </div>
-      <div class="yt-info">
-        <p class="yt-title">{{ post['youtube_title'] or 'YouTube 影片' }}</p>
-        <p class="yt-domain"><i class="ti ti-brand-youtube"></i> youtube.com</p>
+      <div class="link-info">
+        <p class="link-title">{{ post.preview_title or post.preview_domain }}</p>
+        <p class="link-domain">
+          {% if post.preview_is_youtube %}
+          <i class="ti ti-brand-youtube"></i>
+          {% else %}
+          <i class="ti ti-world"></i>
+          {% endif %}
+          {{ post.preview_domain }}
+        </p>
       </div>
     </a>
     {% endif %}

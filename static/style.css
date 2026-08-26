@@ -326,26 +326,28 @@ body {
 .blog-content { font-size: 14px; color: #412402; margin: 0 0 8px; white-space: pre-wrap; }
 .blog-image { width: 100%; border-radius: 10px; display: block; margin-bottom: 8px; }
 
-.yt-preview {
+.link-preview {
   display: flex; gap: 10px; text-decoration: none; color: inherit;
   border: 1px solid #F0E3C8; border-radius: 10px; padding: 8px; margin-bottom: 10px;
   background: #FAF6EC;
 }
-.yt-thumb-wrap {
+.link-thumb-wrap {
   position: relative; width: 96px; height: 72px; flex-shrink: 0;
   border-radius: 8px; overflow: hidden; background: #000;
+  display: flex; align-items: center; justify-content: center;
 }
-.yt-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
-.yt-play-icon {
+.link-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+.link-thumb-fallback { color: #B4B2A9; font-size: 22px; background: #F5EFE0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.link-play-icon {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   color: #fff; font-size: 22px; text-shadow: 0 1px 4px rgba(0,0,0,0.5);
 }
-.yt-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
-.yt-title {
+.link-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.link-title {
   margin: 0 0 4px; font-size: 13px; font-weight: 700; color: #412402;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.yt-domain { margin: 0; font-size: 11px; color: #B4B2A9; display: flex; align-items: center; gap: 4px; }
+.link-domain { margin: 0; font-size: 11px; color: #B4B2A9; display: flex; align-items: center; gap: 4px; }
 
 .blog-comments { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
 .blog-comment-row {

@@ -6,29 +6,19 @@
   {% for m in messages %}
   <div class="msg-row {{ 'me' if m['sender_id'] == me_id else 'them' }}">
     <div class="msg-bubble-wrap">
-      <div class="msg-bubble" id="msg-bubble-{{ m['id'] }}">
+      <div class="msg-bubble">
         {% if m['image_filename'] %}
+        {% if m['image_filename'].startswith('http') %}
+        <img src="{{ m['image_filename'] }}" class="msg-image">
+        {% else %}
         <img src="{{ url_for('static', filename='uploads/' ~ m['image_filename']) }}" class="msg-image">
+        {% endif %}
         {% endif %}
         {% if m['text'] %}<p>{{ m['text'] }}</p>{% endif %}
         <span class="msg-time">{{ m['created_at'][5:16] }}</span>
       </div>
 
-      <form
-        id="msg-edit-form-{{ m['id'] }}"
-        action="{{ url_for('edit_message', message_id=m['id']) }}"
-        method="post"
-        class="msg-edit-form"
-        style="display:none;"
-      >
-        <input type="text" name="text" value="{{ m['text'] or '' }}" placeholder="編輯留言文字...">
-        <button type="submit"><i class="ti ti-check"></i></button>
-      </form>
-
       <div class="msg-actions">
-        <button type="button" class="msg-action-btn" onclick="toggleMsgEdit({{ m['id'] }})">
-          <i class="ti ti-pencil"></i> 編輯
-        </button>
         <form
           action="{{ url_for('delete_message', message_id=m['id']) }}"
           method="post"
@@ -43,20 +33,6 @@
   <p class="empty-hint">還沒有留言，跟對方說句話吧</p>
   {% endfor %}
 </div>
-
-<script>
-function toggleMsgEdit(id) {
-  const bubble = document.getElementById('msg-bubble-' + id);
-  const form = document.getElementById('msg-edit-form-' + id);
-  if (form.style.display === 'none') {
-    form.style.display = 'flex';
-    bubble.style.display = 'none';
-  } else {
-    form.style.display = 'none';
-    bubble.style.display = 'block';
-  }
-}
-</script>
 
 <form action="{{ url_for('messages') }}" method="post" enctype="multipart/form-data" class="message-input-bar">
   <label class="upload-btn">

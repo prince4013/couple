@@ -3,6 +3,8 @@ import os
 import re
 import sqlite3
 from datetime import datetime, date, timedelta
+from html.parser import HTMLParser
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import requests
@@ -249,6 +251,24 @@ def init_db():
         cur.execute(stmt)
     conn.commit()
 
+    # 輕量欄位遷移：CREATE TABLE IF NOT EXISTS 不會幫已經存在的資料表加新欄位，
+    # 這裡手動確保 blog_posts 有「通用連結預覽」需要的欄位（不限 YouTube）。
+    def ensure_column(table, column, col_type):
+        if USE_POSTGRES:
+            cur.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {col_type}")
+        else:
+            cur.execute(f"PRAGMA table_info({table})")
+            existing_cols = [row[1] for row in cur.fetchall()]
+            if column not in existing_cols:
+                cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+
+    ensure_column("blog_posts", "link_url", "TEXT")
+    ensure_column("blog_posts", "link_title", "TEXT")
+    ensure_column("blog_posts", "link_thumbnail", "TEXT")
+    ensure_column("blog_posts", "link_domain", "TEXT")
+    ensure_column("blog_posts", "link_is_youtube", "INTEGER")
+    conn.commit()
+
     cur.execute("SELECT COUNT(*) FROM users")
     user_count = cur.fetchone()[0]
 
@@ -398,7 +418,7 @@ def upload_to_supabase_storage(file_storage, filename):
     return f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_STORAGE_BUCKET}/{filename}"
 
 
-# ---------- YouTube 連結預覽 ----------
+# ---------- 連結預覽（YouTube 用專屬 API，其他網站用通用的 og 標籤解析） ----------
 
 YOUTUBE_ID_RE = re.compile(
     r"(?:youtube\.com/(?:watch\?v=|shorts/|embed/)|youtu\.be/)([a-zA-Z0-9_-]{11})"
@@ -424,6 +444,61 @@ def fetch_youtube_title(url):
         return resp.json().get("title")
     except (requests.RequestException, ValueError, KeyError):
         return None
+
+
+class _MetaTagParser(HTMLParser):
+    """輕量 HTML 解析器，只抓 <title> 跟 Open Graph 的 og:title / og:image。
+    大部分網站（Threads、Instagram、新聞網站...）都會放這些標籤給連結預覽用。"""
+
+    def __init__(self):
+        super().__init__()
+        self.title = None
+        self.og_title = None
+        self.og_image = None
+        self._in_title_tag = False
+
+    def handle_starttag(self, tag, attrs):
+        attrs_dict = dict(attrs)
+        if tag == "meta":
+            prop = attrs_dict.get("property") or attrs_dict.get("name") or ""
+            content = attrs_dict.get("content")
+            if content:
+                if prop.lower() == "og:title":
+                    self.og_title = content
+                elif prop.lower() == "og:image":
+                    self.og_image = content
+        elif tag == "title":
+            self._in_title_tag = True
+
+    def handle_endtag(self, tag):
+        if tag == "title":
+            self._in_title_tag = False
+
+    def handle_data(self, data):
+        if self._in_title_tag and not self.title:
+            self.title = data.strip()
+
+
+def fetch_link_preview(url):
+    """通用連結預覽：回傳 (title, thumbnail_url, domain)。抓不到的部分回傳 None，
+    網域一定拿得到（純字串解析網址，不需要真的連線）。"""
+    domain = urlparse(url).netloc.replace("www.", "") or url
+    title, thumbnail = None, None
+    try:
+        resp = requests.get(
+            url,
+            timeout=6,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; CoupleAppLinkPreview/1.0)"},
+        )
+        content_type = resp.headers.get("Content-Type", "")
+        if resp.ok and "text/html" in content_type:
+            parser = _MetaTagParser()
+            parser.feed(resp.text[:200000])  # 只解析前面一段，避免超大頁面拖慢速度
+            title = parser.og_title or parser.title
+            thumbnail = parser.og_image
+    except requests.RequestException:
+        pass
+    return title, thumbnail, domain
 
 
 # ---------- Web Push（即時推播通知） ----------
@@ -598,8 +673,18 @@ def messages():
         image_filename = None
         file = request.files.get("image")
         if file and file.filename and allowed_file(file.filename):
-            image_filename = f"{int(datetime.now().timestamp())}_{secure_filename(file.filename)}"
-            file.save(os.path.join(UPLOAD_DIR, image_filename))
+            filename = f"{int(datetime.now().timestamp())}_{secure_filename(file.filename)}"
+            if SUPABASE_STORAGE_ENABLED:
+                # 存到 Supabase Storage，這樣 Render 重新部署後圖片才不會消失
+                try:
+                    image_filename = upload_to_supabase_storage(file, f"messages/{filename}")
+                except (requests.RequestException, RuntimeError) as ex:
+                    flash(f"上傳圖片失敗：{ex}")
+            else:
+                # 沒設定 Supabase Storage 時，退回存在 Render 本機磁碟
+                # ⚠️ 這種狀況下，圖片會在下次重新部署後消失
+                file.save(os.path.join(UPLOAD_DIR, filename))
+                image_filename = filename
         if text or image_filename:
             db = get_db()
             run(
@@ -621,14 +706,6 @@ def messages():
     partner = fetch_user(other_id(current_user_id()))
     return render_template("messages.html", messages=msgs, me=me, partner=partner)
 
-
-@app.route("/messages/edit/<int:message_id>", methods=["POST"])
-def edit_message(message_id):
-    text = request.form.get("text", "").strip()
-    db = get_db()
-    run(db, "UPDATE messages SET text = ? WHERE id = ?", (text or None, message_id))
-    db.commit()
-    return redirect(url_for("messages"))
 
 
 @app.route("/messages/delete/<int:message_id>", methods=["POST"])
@@ -806,9 +883,20 @@ def delete_memory(memory_id):
 @app.route("/blog")
 def blog():
     db = get_db()
-    posts = run(db, "SELECT * FROM blog_posts ORDER BY id DESC").fetchall()
+    raw_posts = run(db, "SELECT * FROM blog_posts ORDER BY id DESC").fetchall()
+    posts = []
     comments_by_post = {}
-    for post in posts:
+    for row in raw_posts:
+        post = dict(row)
+        # 相容舊資料：以前只有 youtube_* 欄位，現在統一用 link_* 欄位，
+        # 沒有 link_url 的舊貼文就退回用 youtube_url 顯示。
+        post["preview_url"] = post.get("link_url") or post.get("youtube_url")
+        post["preview_title"] = post.get("link_title") or post.get("youtube_title")
+        post["preview_thumbnail"] = post.get("link_thumbnail") or post.get("youtube_thumbnail")
+        is_youtube = bool(post.get("link_is_youtube")) or bool(post.get("youtube_url"))
+        post["preview_is_youtube"] = is_youtube
+        post["preview_domain"] = post.get("link_domain") or ("youtube.com" if is_youtube else None)
+        posts.append(post)
         comments_by_post[post["id"]] = run(
             db, "SELECT * FROM blog_comments WHERE post_id = ? ORDER BY id ASC", (post["id"],)
         ).fetchall()
@@ -823,7 +911,7 @@ def blog():
 @app.route("/blog/new", methods=["POST"])
 def new_blog_post():
     content = request.form.get("content", "").strip()
-    youtube_url = request.form.get("youtube_url", "").strip()
+    link_url = request.form.get("link_url", "").strip()
     file = request.files.get("image")
 
     image_url = None
@@ -841,28 +929,32 @@ def new_blog_post():
             flash(f"上傳圖片失敗：{ex}")
             return redirect(url_for("blog"))
 
-    youtube_title, youtube_thumb = None, None
-    if youtube_url:
-        video_id = extract_youtube_id(youtube_url)
+    link_title, link_thumbnail, link_domain, is_youtube = None, None, None, False
+    if link_url:
+        video_id = extract_youtube_id(link_url)
         if video_id:
-            youtube_thumb = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
-            youtube_title = fetch_youtube_title(youtube_url) or "YouTube 影片"
+            is_youtube = True
+            link_domain = "youtube.com"
+            link_thumbnail = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+            link_title = fetch_youtube_title(link_url) or "YouTube 影片"
         else:
-            flash("這個 YouTube 網址看起來怪怪的，還是先幫你存起來了")
+            # 不是 YouTube，就用通用的方式去抓網頁的標題跟縮圖（Threads、新聞網站...都適用）
+            link_title, link_thumbnail, link_domain = fetch_link_preview(link_url)
 
-    if not (content or image_url or youtube_url):
-        flash("至少要留點文字、一張圖片，或一個 YouTube 連結")
+    if not (content or image_url or link_url):
+        flash("至少要留點文字、一張圖片，或一個連結")
         return redirect(url_for("blog"))
 
     db = get_db()
     cur = run(
         db,
         "INSERT INTO blog_posts "
-        "(sender_id, content, image_url, youtube_url, youtube_title, youtube_thumbnail, created_at) "
-        "VALUES (?,?,?,?,?,?,?) RETURNING id",
+        "(sender_id, content, image_url, link_url, link_title, link_thumbnail, link_domain, link_is_youtube, created_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?) RETURNING id",
         (
             current_user_id(), content or None, image_url,
-            youtube_url or None, youtube_title, youtube_thumb, now_str(),
+            link_url or None, link_title, link_thumbnail, link_domain,
+            1 if is_youtube else 0, now_str(),
         ),
     )
     new_id = cur.fetchone()["id"]
@@ -871,8 +963,8 @@ def new_blog_post():
     me = fetch_user(current_user_id())
     if content:
         preview = content
-    elif youtube_url:
-        preview = "分享了一部影片"
+    elif link_url:
+        preview = "分享了一個連結"
     else:
         preview = "分享了一張照片"
     send_push_to_user(other_id(current_user_id()), f"{me['name']} 發了新動態", preview, "/blog")
