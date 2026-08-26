@@ -12,25 +12,15 @@
   </div>
 
   <div class="card">
-    <p class="section-label">美的資料</p>
+    <p class="section-label">{{ user_a['name'] }} 的資料</p>
     <input type="text" name="name_a" value="{{ user_a['name'] }}" placeholder="名字">
-    <input type="text" name="city_a" value="{{ user_a['city'] }}" placeholder="城市">
-    <select name="timezone_a">
-      {% for tz in timezones %}
-      <option value="{{ tz }}" {{ 'selected' if tz == user_a['timezone'] else '' }}>{{ tz }}</option>
-      {% endfor %}
-    </select>
+    <p class="fixed-location"><i class="ti ti-map-pin"></i> {{ user_a['city'] }}（{{ user_a['timezone'] }}）· 地點已固定</p>
   </div>
 
   <div class="card">
-    <p class="section-label">Alex 的資料</p>
+    <p class="section-label">{{ user_b['name'] }} 的資料</p>
     <input type="text" name="name_b" value="{{ user_b['name'] }}" placeholder="名字">
-    <input type="text" name="city_b" value="{{ user_b['city'] }}" placeholder="城市">
-    <select name="timezone_b">
-      {% for tz in timezones %}
-      <option value="{{ tz }}" {{ 'selected' if tz == user_b['timezone'] else '' }}>{{ tz }}</option>
-      {% endfor %}
-    </select>
+    <p class="fixed-location"><i class="ti ti-map-pin"></i> {{ user_b['city'] }}（{{ user_b['timezone'] }}）· 地點已固定</p>
   </div>
 
   <button type="submit" class="save-btn">儲存設定</button>

@@ -6,7 +6,7 @@
   <div class="avatar" style="background:{{ partner['avatar_color'] }}">{{ partner['name'][0] }}</div>
   <div class="partner-info">
     <p class="partner-name">{{ partner['name'] }} · {{ partner['city'] }} {{ partner_time }}</p>
-    <p class="partner-weather"><i class="ti ti-cloud"></i> {{ partner['weather'] or '尚未更新天氣' }}</p>
+    <p class="partner-weather"><i class="ti {{ partner_weather.icon }}"></i> {{ partner_weather.text }}</p>
   </div>
   <span class="status-pill">{{ partner['status'] or '尚未更新狀態' }}</span>
 </div>
@@ -59,7 +59,6 @@
       <option value="{{ s }}" {{ 'selected' if s == me['status'] else '' }}>{{ s }}</option>
       {% endfor %}
     </select>
-    <input type="text" name="weather" placeholder="今天天氣，例如 26°C 晴" value="{{ me['weather'] }}">
     <button type="submit">更新</button>
   </form>
 </div>
@@ -70,7 +69,7 @@
   {% for gft in recent_gifts %}
   <div class="gift-feed-item">
     <i class="ti {{ gift_labels[gft['gift_type']][1] }}"></i>
-    <span>{{ 'Alex' if gft['sender_id']=='b' else '美' }} 送出了「{{ gift_labels[gft['gift_type']][0] }}」</span>
+    <span>{{ user_names[gft['sender_id']] }} 送出了「{{ gift_labels[gft['gift_type']][0] }}」</span>
     <span class="gift-time">{{ gft['created_at'][5:16] }}</span>
   </div>
   {% endfor %}

@@ -5,7 +5,7 @@
 <a href="{{ url_for('questions') }}" class="back-link"><i class="ti ti-chevron-left"></i> 所有小問題</a>
 
 <div class="card question-card">
-  <p class="q-meta">{{ 'Alex' if question['asker_id']=='b' else '美' }} 提問 · {{ question['created_at'][5:16] }}</p>
+  <p class="q-meta">{{ user_names[question['asker_id']] }} 提問 · {{ question['created_at'][5:16] }}</p>
   <p class="question-main-text">{{ question['question_text'] }}</p>
 </div>
 

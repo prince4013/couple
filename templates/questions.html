@@ -16,7 +16,7 @@
     <i class="ti ti-message-2-question"></i>
     <div class="thread-item-text">
       <p class="q-text">{{ t['question_text'] }}</p>
-      <p class="q-meta">{{ 'Alex' if t['asker_id']=='b' else '美' }} 提問 · {{ t['reply_count'] }} 則回覆</p>
+      <p class="q-meta">{{ user_names[t['asker_id']] }} 提問 · {{ t['reply_count'] }} 則回覆</p>
     </div>
     <i class="ti ti-chevron-right"></i>
   </a>

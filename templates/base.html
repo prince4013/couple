@@ -14,8 +14,8 @@
     <span>{{ now_display if now_display else '' }}</span>
     <div class="identity-switch">
       目前身分：
-      <a href="{{ url_for('switch', uid='a') }}" class="{{ 'active' if me_id=='a' else '' }}">美</a> /
-      <a href="{{ url_for('switch', uid='b') }}" class="{{ 'active' if me_id=='b' else '' }}">Alex</a>
+      <a href="{{ url_for('switch', uid='a') }}" class="{{ 'active' if me_id=='a' else '' }}">我是老婆</a> /
+      <a href="{{ url_for('switch', uid='b') }}" class="{{ 'active' if me_id=='b' else '' }}">我是老公</a>
     </div>
   </div>
 
