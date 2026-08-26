@@ -18,15 +18,36 @@
 <div class="card">
   <p class="section-label">新增一段回憶</p>
   <form action="{{ url_for('add_memory') }}" method="post" enctype="multipart/form-data" class="memory-add-form">
-    <label class="memory-upload-btn">
-      <i class="ti ti-photo-plus"></i> 選擇照片
-      <input type="file" name="image" accept="image/*" required {{ 'disabled' if not storage_enabled }}>
+    <label class="memory-upload-btn" id="memory-upload-label">
+      <i class="ti ti-photo-plus"></i> <span id="memory-upload-text">選擇照片</span>
+      <input
+        type="file" name="image" id="memory-image-input" accept="image/*"
+        required {{ 'disabled' if not storage_enabled }}
+        onchange="previewMemoryImage(event)"
+      >
     </label>
+    <img id="memory-preview" class="memory-preview" style="display:none;" alt="照片預覽">
     <input type="date" name="memory_date" required {{ 'disabled' if not storage_enabled }}>
     <input type="text" name="caption" placeholder="這張照片的故事（選填）" {{ 'disabled' if not storage_enabled }}>
     <button type="submit" class="save-btn" {{ 'disabled' if not storage_enabled }}>加入時間軸</button>
   </form>
 </div>
+
+<script>
+function previewMemoryImage(event) {
+  const file = event.target.files && event.target.files[0];
+  const preview = document.getElementById('memory-preview');
+  const label = document.getElementById('memory-upload-text');
+  if (file) {
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+    label.textContent = '已選擇：' + file.name;
+  } else {
+    preview.style.display = 'none';
+    label.textContent = '選擇照片';
+  }
+}
+</script>
 
 <div class="timeline">
   {% for m in memories %}
@@ -36,11 +57,11 @@
       <span class="timeline-line"></span>
     </div>
     <div class="timeline-content">
-      <p class="timeline-date">{{ m['memory_date'] }} · {{ user_names[m['sender_id']] }}</p>
-      <img src="{{ m['image_url'] }}" class="timeline-image" alt="回憶照片">
+      <p class="timeline-date">{{ m['memory_date'] }}</p>
       {% if m['caption'] %}
       <p class="timeline-caption">{{ m['caption'] }}</p>
       {% endif %}
+      <img src="{{ m['image_url'] }}" class="timeline-image" alt="回憶照片">
       <form action="{{ url_for('delete_memory', memory_id=m['id']) }}" method="post"
             onsubmit="return confirm('確定要刪除這段回憶嗎？');">
         <button type="submit" class="timeline-delete-btn"><i class="ti ti-trash"></i> 刪除</button>
