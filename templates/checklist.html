@@ -52,4 +52,28 @@
   <button type="submit"><i class="ti ti-plus"></i></button>
 </form>
 
+<p class="section-label" style="margin-top:1.25rem;">想吃的東西</p>
+<div class="checklist-card">
+  {% for item in food_items %}
+  <div class="checklist-row">
+    <form action="{{ url_for('toggle_checklist', item_id=item['id']) }}" method="post" class="check-form">
+      <button type="submit" class="check-btn">
+        <i class="ti {{ 'ti-square-rounded-check checked' if item['is_done'] else 'ti-square' }}"></i>
+      </button>
+    </form>
+    <span class="{{ 'done' if item['is_done'] else '' }}">{{ item['text'] }}</span>
+    <form action="{{ url_for('delete_checklist_item', item_id=item['id']) }}" method="post" class="delete-form">
+      <button type="submit" class="delete-btn"><i class="ti ti-x"></i></button>
+    </form>
+  </div>
+  {% else %}
+  <p class="empty-hint">還沒有想吃的東西</p>
+  {% endfor %}
+</div>
+<form action="{{ url_for('add_checklist_item') }}" method="post" class="add-item-form">
+  <input type="hidden" name="category" value="food">
+  <input type="text" name="text" placeholder="新增想吃的東西">
+  <button type="submit"><i class="ti ti-plus"></i></button>
+</form>
+
 {% endblock %}

@@ -27,6 +27,17 @@
 </form>
 
 <div class="card">
+  <p class="section-label">即時通知</p>
+  <p style="font-size:13px; color:#854F0B; margin:0 0 10px;">
+    啟用之後,對方送禮物、留言、想你了的時候,你會收到手機推播通知。
+    <strong>iPhone 使用者請注意</strong>：要先用 Safari 打開這個網址,
+    點分享按鈕 → 「加入主畫面」,再從主畫面的圖示打開 App(不是從 Safari 分頁),
+    才能啟用通知,這是 iOS 系統本身的限制,無法繞過。
+  </p>
+  <button id="push-btn" type="button" class="save-btn">啟用想你了 / 留言通知</button>
+</div>
+
+<div class="card">
   <p class="section-label">資料清除</p>
   <form
     action="{{ url_for('clear_gifts') }}"

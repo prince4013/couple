@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}回憶相簿 · 橘語{% endblock %}
+{% block content %}
+
+<p class="page-title">共同回憶相簿</p>
+
+{% if not storage_enabled %}
+<div class="card">
+  <p class="section-label">還沒有設定 Supabase Storage</p>
+  <p style="font-size:13px; color:var(--text-secondary, #854F0B); margin:0;">
+    照片要上傳到 Supabase Storage 才能永久保存，去 Render 的 Environment
+    加上 <code>SUPABASE_URL</code> 和 <code>SUPABASE_SERVICE_KEY</code> 這兩個環境變數，
+    詳細步驟看 README。設定好之前這裡沒辦法上傳照片。
+  </p>
+</div>
+{% endif %}
+
+<div class="card">
+  <p class="section-label">新增一段回憶</p>
+  <form action="{{ url_for('add_memory') }}" method="post" enctype="multipart/form-data" class="memory-add-form">
+    <label class="memory-upload-btn">
+      <i class="ti ti-photo-plus"></i> 選擇照片
+      <input type="file" name="image" accept="image/*" required {{ 'disabled' if not storage_enabled }}>
+    </label>
+    <input type="date" name="memory_date" required {{ 'disabled' if not storage_enabled }}>
+    <input type="text" name="caption" placeholder="這張照片的故事（選填）" {{ 'disabled' if not storage_enabled }}>
+    <button type="submit" class="save-btn" {{ 'disabled' if not storage_enabled }}>加入時間軸</button>
+  </form>
+</div>
+
+<div class="timeline">
+  {% for m in memories %}
+  <div class="timeline-row">
+    <div class="timeline-marker">
+      <span class="timeline-dot"></span>
+      <span class="timeline-line"></span>
+    </div>
+    <div class="timeline-content">
+      <p class="timeline-date">{{ m['memory_date'] }} · {{ user_names[m['sender_id']] }}</p>
+      <img src="{{ m['image_url'] }}" class="timeline-image" alt="回憶照片">
+      {% if m['caption'] %}
+      <p class="timeline-caption">{{ m['caption'] }}</p>
+      {% endif %}
+      <form action="{{ url_for('delete_memory', memory_id=m['id']) }}" method="post"
+            onsubmit="return confirm('確定要刪除這段回憶嗎？');">
+        <button type="submit" class="timeline-delete-btn"><i class="ti ti-trash"></i> 刪除</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <p class="empty-hint">還沒有任何回憶，上傳第一張照片開始你們的時間軸吧</p>
+  {% endfor %}
+</div>
+
+{% endblock %}

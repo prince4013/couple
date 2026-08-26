@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 from datetime import datetime, date, timedelta
@@ -6,7 +7,7 @@ from zoneinfo import ZoneInfo
 import requests
 from flask import (
     Flask, g, render_template, request, redirect,
-    url_for, session, flash
+    url_for, session, flash, jsonify
 )
 from werkzeug.utils import secure_filename
 
@@ -24,6 +25,22 @@ USE_POSTGRES = bool(DATABASE_URL)
 if USE_POSTGRES:
     import psycopg2
     import psycopg2.extras
+
+# Supabase Storage：回憶相簿的照片要永久保存，就必須存在這裡，
+# 不能存在 Render 本機磁碟（重新部署會不見）。
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
+SUPABASE_STORAGE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "memories").strip()
+SUPABASE_STORAGE_ENABLED = bool(SUPABASE_URL and SUPABASE_SERVICE_KEY)
+
+# Web Push（讓對方即時收到「想你了」之類的推播通知）需要一組 VAPID 金鑰。
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "").strip()
+VAPID_CLAIM_EMAIL = os.environ.get("VAPID_CLAIM_EMAIL", "example@example.com").strip()
+PUSH_ENABLED = bool(VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY)
+
+if PUSH_ENABLED:
+    from pywebpush import webpush, WebPushException
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
@@ -178,6 +195,26 @@ def init_db():
             created_at TEXT NOT NULL
         )
         """,
+        f"""
+        CREATE TABLE IF NOT EXISTS memories (
+            id {id_type},
+            sender_id TEXT NOT NULL,
+            image_url TEXT NOT NULL,
+            memory_date TEXT NOT NULL,
+            caption TEXT,
+            created_at TEXT NOT NULL
+        )
+        """,
+        f"""
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id {id_type},
+            user_id TEXT NOT NULL,
+            endpoint TEXT NOT NULL,
+            p256dh TEXT NOT NULL,
+            auth TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """,
         """
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
@@ -318,6 +355,55 @@ def get_weather_display(uid):
     return {"text": f"{temp}°C {desc}", "icon": icon}
 
 
+# ---------- Supabase Storage（回憶相簿的照片） ----------
+
+def upload_to_supabase_storage(file_storage, filename):
+    """把上傳的檔案存到 Supabase Storage，回傳可公開存取的網址。
+    沒有設定 SUPABASE_URL / SUPABASE_SERVICE_KEY 時會拋出例外，呼叫端要接住。"""
+    if not SUPABASE_STORAGE_ENABLED:
+        raise RuntimeError("尚未設定 Supabase Storage（缺少 SUPABASE_URL 或 SUPABASE_SERVICE_KEY）")
+
+    upload_url = f"{SUPABASE_URL}/storage/v1/object/{SUPABASE_STORAGE_BUCKET}/{filename}"
+    headers = {
+        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+        "apikey": SUPABASE_SERVICE_KEY,
+        "Content-Type": file_storage.mimetype or "application/octet-stream",
+        "x-upsert": "true",
+    }
+    resp = requests.post(upload_url, headers=headers, data=file_storage.read(), timeout=20)
+    resp.raise_for_status()
+    return f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_STORAGE_BUCKET}/{filename}"
+
+
+# ---------- Web Push（即時推播通知） ----------
+
+def send_push_to_user(uid, title, body, url_path="/home"):
+    """推播給某個使用者的所有已訂閱裝置。沒設定 VAPID 金鑰時直接跳過，不影響原本功能。"""
+    if not PUSH_ENABLED:
+        return
+    db = get_db()
+    subs = run(db, "SELECT * FROM push_subscriptions WHERE user_id = ?", (uid,)).fetchall()
+    payload = json.dumps({"title": title, "body": body, "url": url_path})
+    for sub in subs:
+        subscription_info = {
+            "endpoint": sub["endpoint"],
+            "keys": {"p256dh": sub["p256dh"], "auth": sub["auth"]},
+        }
+        try:
+            webpush(
+                subscription_info=subscription_info,
+                data=payload,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={"sub": f"mailto:{VAPID_CLAIM_EMAIL}"},
+            )
+        except WebPushException as ex:
+            status = ex.response.status_code if ex.response is not None else None
+            if status in (404, 410):
+                # 訂閱已經失效（例如對方移除了 App 或很久沒開），順手清掉，避免每次都白跑一趟
+                run(db, "DELETE FROM push_subscriptions WHERE id = ?", (sub["id"],))
+                db.commit()
+
+
 @app.context_processor
 def inject_globals():
     a = fetch_user("a")
@@ -326,6 +412,8 @@ def inject_globals():
         "me_id": current_user_id(),
         "gift_labels": GIFT_LABELS,
         "user_names": {"a": a["name"], "b": b["name"]},
+        "push_enabled": PUSH_ENABLED,
+        "vapid_public_key": VAPID_PUBLIC_KEY,
     }
 
 
@@ -433,6 +521,13 @@ def send_gift(gift_type):
     db.commit()
     label = GIFT_LABELS[gift_type][0]
     flash(f"已送出「{label}」給對方")
+
+    me = fetch_user(current_user_id())
+    if gift_type == "miss_you":
+        send_push_to_user(other_id(current_user_id()), f"{me['name']} 想你了 💛", "點開來回應對方一下吧")
+    else:
+        send_push_to_user(other_id(current_user_id()), f"{me['name']} 送你「{label}」", "打開 App 看看吧")
+
     return redirect(url_for("home"))
 
 
@@ -462,6 +557,9 @@ def messages():
                 (current_user_id(), text or None, image_filename, now_str()),
             )
             db.commit()
+            me = fetch_user(current_user_id())
+            preview = text if text else "傳了一張照片"
+            send_push_to_user(other_id(current_user_id()), f"{me['name']} 留言給你", preview, "/messages")
         return redirect(url_for("messages"))
 
     db = get_db()
@@ -502,6 +600,10 @@ def new_question():
         )
         new_id = cur.fetchone()["id"]
         db.commit()
+        me = fetch_user(current_user_id())
+        send_push_to_user(
+            other_id(current_user_id()), f"{me['name']} 問了你一個小問題", text, f"/questions/{new_id}"
+        )
         return redirect(url_for("question_thread", qid=new_id))
     return redirect(url_for("questions"))
 
@@ -518,6 +620,10 @@ def question_thread(qid):
                 (qid, current_user_id(), reply_text, now_str()),
             )
             db.commit()
+            me = fetch_user(current_user_id())
+            send_push_to_user(
+                other_id(current_user_id()), f"{me['name']} 回覆了小問題", reply_text, f"/questions/{qid}"
+            )
         return redirect(url_for("question_thread", qid=qid))
 
     question = run(db, "SELECT * FROM questions WHERE id = ?", (qid,)).fetchone()
@@ -535,7 +641,10 @@ def checklist():
     db = get_db()
     bring_items = run(db, "SELECT * FROM checklist_items WHERE category = 'bring' ORDER BY id ASC").fetchall()
     place_items = run(db, "SELECT * FROM checklist_items WHERE category = 'place' ORDER BY id ASC").fetchall()
-    return render_template("checklist.html", bring_items=bring_items, place_items=place_items)
+    food_items = run(db, "SELECT * FROM checklist_items WHERE category = 'food' ORDER BY id ASC").fetchall()
+    return render_template(
+        "checklist.html", bring_items=bring_items, place_items=place_items, food_items=food_items
+    )
 
 
 @app.route("/checklist/toggle/<int:item_id>", methods=["POST"])
@@ -550,7 +659,7 @@ def toggle_checklist(item_id):
 def add_checklist_item():
     category = request.form.get("category")
     text = request.form.get("text", "").strip()
-    if text and category in ("bring", "place"):
+    if text and category in ("bring", "place", "food"):
         db = get_db()
         run(
             db,
@@ -567,6 +676,96 @@ def delete_checklist_item(item_id):
     run(db, "DELETE FROM checklist_items WHERE id = ?", (item_id,))
     db.commit()
     return redirect(url_for("checklist"))
+
+
+@app.route("/memories")
+def memories():
+    db = get_db()
+    # 越下面是越早的故事：依 memory_date 由新到舊排序（最新的在最上面）
+    items = run(
+        db, "SELECT * FROM memories ORDER BY memory_date DESC, id DESC"
+    ).fetchall()
+    return render_template(
+        "memories.html", memories=items, storage_enabled=SUPABASE_STORAGE_ENABLED
+    )
+
+
+@app.route("/memories/add", methods=["POST"])
+def add_memory():
+    if not SUPABASE_STORAGE_ENABLED:
+        flash("還沒有設定 Supabase Storage，沒辦法上傳照片，先去設定頁看說明")
+        return redirect(url_for("memories"))
+
+    file = request.files.get("image")
+    memory_date = request.form.get("memory_date", "").strip()
+    caption = request.form.get("caption", "").strip()
+
+    if not file or not file.filename or not allowed_file(file.filename):
+        flash("請選擇一張照片")
+        return redirect(url_for("memories"))
+    if not memory_date:
+        flash("請選擇這張照片的日期")
+        return redirect(url_for("memories"))
+
+    filename = f"{int(datetime.now().timestamp())}_{secure_filename(file.filename)}"
+    try:
+        image_url = upload_to_supabase_storage(file, filename)
+    except (requests.RequestException, RuntimeError) as ex:
+        flash(f"上傳照片失敗：{ex}")
+        return redirect(url_for("memories"))
+
+    db = get_db()
+    run(
+        db,
+        "INSERT INTO memories (sender_id, image_url, memory_date, caption, created_at) VALUES (?,?,?,?,?)",
+        (current_user_id(), image_url, memory_date, caption or None, now_str()),
+    )
+    db.commit()
+    flash("回憶已經加進時間軸了")
+    return redirect(url_for("memories"))
+
+
+@app.route("/memories/delete/<int:memory_id>", methods=["POST"])
+def delete_memory(memory_id):
+    db = get_db()
+    run(db, "DELETE FROM memories WHERE id = ?", (memory_id,))
+    db.commit()
+    return redirect(url_for("memories"))
+
+
+@app.route("/push/subscribe", methods=["POST"])
+def push_subscribe():
+    data = request.get_json(silent=True) or {}
+    endpoint = data.get("endpoint")
+    keys = data.get("keys") or {}
+    p256dh, auth = keys.get("p256dh"), keys.get("auth")
+    if not (endpoint and p256dh and auth):
+        return jsonify({"ok": False, "error": "缺少必要欄位"}), 400
+
+    db = get_db()
+    existing = run(
+        db, "SELECT id FROM push_subscriptions WHERE user_id = ? AND endpoint = ?",
+        (current_user_id(), endpoint),
+    ).fetchone()
+    if not existing:
+        run(
+            db,
+            "INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, created_at) VALUES (?,?,?,?,?)",
+            (current_user_id(), endpoint, p256dh, auth, now_str()),
+        )
+        db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/push/unsubscribe", methods=["POST"])
+def push_unsubscribe():
+    data = request.get_json(silent=True) or {}
+    endpoint = data.get("endpoint")
+    if endpoint:
+        db = get_db()
+        run(db, "DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,))
+        db.commit()
+    return jsonify({"ok": True})
 
 
 @app.route("/settings", methods=["GET", "POST"])

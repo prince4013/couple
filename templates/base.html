@@ -6,6 +6,19 @@
 <title>{% block title %}橘語 · 遠距情侶{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+
+<link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+<meta name="theme-color" content="#D85A30">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="橘語">
+
+<script>
+  window.PUSH_ENABLED = {{ 'true' if push_enabled else 'false' }};
+  window.VAPID_PUBLIC_KEY = {{ vapid_public_key|tojson }};
+</script>
+<script src="{{ url_for('static', filename='push.js') }}" defer></script>
 </head>
 <body>
 <div class="phone">
@@ -43,6 +56,9 @@
     </a>
     <a href="{{ url_for('checklist') }}" class="{{ 'active' if request.endpoint=='checklist' else '' }}">
       <i class="ti ti-checklist"></i><span>清單</span>
+    </a>
+    <a href="{{ url_for('memories') }}" class="{{ 'active' if request.endpoint=='memories' else '' }}">
+      <i class="ti ti-photo"></i><span>回憶</span>
     </a>
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' else '' }}">
       <i class="ti ti-settings"></i><span>設定</span>
