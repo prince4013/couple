@@ -611,6 +611,8 @@ def messages():
             me = fetch_user(current_user_id())
             preview = text if text else "傳了一張照片"
             send_push_to_user(other_id(current_user_id()), f"{me['name']} 留言給你", preview, "/messages")
+            if image_filename:
+                flash("圖片已上傳")
         return redirect(url_for("messages"))
 
     db = get_db()
@@ -618,6 +620,23 @@ def messages():
     me = fetch_user(current_user_id())
     partner = fetch_user(other_id(current_user_id()))
     return render_template("messages.html", messages=msgs, me=me, partner=partner)
+
+
+@app.route("/messages/edit/<int:message_id>", methods=["POST"])
+def edit_message(message_id):
+    text = request.form.get("text", "").strip()
+    db = get_db()
+    run(db, "UPDATE messages SET text = ? WHERE id = ?", (text or None, message_id))
+    db.commit()
+    return redirect(url_for("messages"))
+
+
+@app.route("/messages/delete/<int:message_id>", methods=["POST"])
+def delete_message(message_id):
+    db = get_db()
+    run(db, "DELETE FROM messages WHERE id = ?", (message_id,))
+    db.commit()
+    return redirect(url_for("messages"))
 
 
 def allowed_file(filename):

@@ -39,6 +39,19 @@
   {% endfor %}
 </div>
 
+{% if recent_gifts %}
+<div class="card gift-feed">
+  <p class="section-label">最近的禮物</p>
+  {% for gft in recent_gifts %}
+  <div class="gift-feed-item">
+    <i class="ti {{ gift_labels[gft['gift_type']][1] }}"></i>
+    <span>{{ user_names[gft['sender_id']] }} 送出了「{{ gift_labels[gft['gift_type']][0] }}」</span>
+    <span class="gift-time">{{ gft['created_at'][5:16] }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 {% if latest_question %}
 <a href="{{ url_for('question_thread', qid=latest_question['id']) }}" class="question-preview">
   <i class="ti ti-message-2-question"></i>
@@ -80,18 +93,5 @@
     <button type="submit"><i class="ti ti-plus"></i></button>
   </form>
 </div>
-
-{% if recent_gifts %}
-<div class="card gift-feed">
-  <p class="section-label">最近的禮物</p>
-  {% for gft in recent_gifts %}
-  <div class="gift-feed-item">
-    <i class="ti {{ gift_labels[gft['gift_type']][1] }}"></i>
-    <span>{{ user_names[gft['sender_id']] }} 送出了「{{ gift_labels[gft['gift_type']][0] }}」</span>
-    <span class="gift-time">{{ gft['created_at'][5:16] }}</span>
-  </div>
-  {% endfor %}
-</div>
-{% endif %}
 
 {% endblock %}
