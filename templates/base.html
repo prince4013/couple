@@ -60,6 +60,9 @@
     <a href="{{ url_for('memories') }}" class="{{ 'active' if request.endpoint=='memories' else '' }}">
       <i class="ti ti-photo"></i><span>回憶</span>
     </a>
+    <a href="{{ url_for('blog') }}" class="{{ 'active' if request.endpoint=='blog' else '' }}">
+      <i class="ti ti-news"></i><span>動態</span>
+    </a>
     <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint=='settings' else '' }}">
       <i class="ti ti-settings"></i><span>設定</span>
     </a>

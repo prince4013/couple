@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sqlite3
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
@@ -215,6 +216,28 @@ def init_db():
             created_at TEXT NOT NULL
         )
         """,
+        f"""
+        CREATE TABLE IF NOT EXISTS blog_posts (
+            id {id_type},
+            sender_id TEXT NOT NULL,
+            content TEXT,
+            image_url TEXT,
+            youtube_url TEXT,
+            youtube_title TEXT,
+            youtube_thumbnail TEXT,
+            created_at TEXT NOT NULL
+        )
+        """,
+        f"""
+        CREATE TABLE IF NOT EXISTS blog_comments (
+            id {id_type},
+            post_id INTEGER NOT NULL,
+            sender_id TEXT NOT NULL,
+            comment_text TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (post_id) REFERENCES blog_posts(id)
+        )
+        """,
         """
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
@@ -373,6 +396,34 @@ def upload_to_supabase_storage(file_storage, filename):
     resp = requests.post(upload_url, headers=headers, data=file_storage.read(), timeout=20)
     resp.raise_for_status()
     return f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_STORAGE_BUCKET}/{filename}"
+
+
+# ---------- YouTube 連結預覽 ----------
+
+YOUTUBE_ID_RE = re.compile(
+    r"(?:youtube\.com/(?:watch\?v=|shorts/|embed/)|youtu\.be/)([a-zA-Z0-9_-]{11})"
+)
+
+
+def extract_youtube_id(url):
+    if not url:
+        return None
+    match = YOUTUBE_ID_RE.search(url)
+    return match.group(1) if match else None
+
+
+def fetch_youtube_title(url):
+    """呼叫 YouTube 的公開 oEmbed API 拿標題，不需要金鑰。失敗就回傳 None。"""
+    try:
+        resp = requests.get(
+            "https://www.youtube.com/oembed",
+            params={"url": url, "format": "json"},
+            timeout=6,
+        )
+        resp.raise_for_status()
+        return resp.json().get("title")
+    except (requests.RequestException, ValueError, KeyError):
+        return None
 
 
 # ---------- Web Push（即時推播通知） ----------
@@ -731,6 +782,108 @@ def delete_memory(memory_id):
     run(db, "DELETE FROM memories WHERE id = ?", (memory_id,))
     db.commit()
     return redirect(url_for("memories"))
+
+
+@app.route("/blog")
+def blog():
+    db = get_db()
+    posts = run(db, "SELECT * FROM blog_posts ORDER BY id DESC").fetchall()
+    comments_by_post = {}
+    for post in posts:
+        comments_by_post[post["id"]] = run(
+            db, "SELECT * FROM blog_comments WHERE post_id = ? ORDER BY id ASC", (post["id"],)
+        ).fetchall()
+    return render_template(
+        "blog.html",
+        posts=posts,
+        comments_by_post=comments_by_post,
+        storage_enabled=SUPABASE_STORAGE_ENABLED,
+    )
+
+
+@app.route("/blog/new", methods=["POST"])
+def new_blog_post():
+    content = request.form.get("content", "").strip()
+    youtube_url = request.form.get("youtube_url", "").strip()
+    file = request.files.get("image")
+
+    image_url = None
+    if file and file.filename:
+        if not allowed_file(file.filename):
+            flash("圖片格式不支援")
+            return redirect(url_for("blog"))
+        if not SUPABASE_STORAGE_ENABLED:
+            flash("還沒有設定 Supabase Storage，沒辦法上傳圖片")
+            return redirect(url_for("blog"))
+        filename = f"blog/{int(datetime.now().timestamp())}_{secure_filename(file.filename)}"
+        try:
+            image_url = upload_to_supabase_storage(file, filename)
+        except (requests.RequestException, RuntimeError) as ex:
+            flash(f"上傳圖片失敗：{ex}")
+            return redirect(url_for("blog"))
+
+    youtube_title, youtube_thumb = None, None
+    if youtube_url:
+        video_id = extract_youtube_id(youtube_url)
+        if video_id:
+            youtube_thumb = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+            youtube_title = fetch_youtube_title(youtube_url) or "YouTube 影片"
+        else:
+            flash("這個 YouTube 網址看起來怪怪的，還是先幫你存起來了")
+
+    if not (content or image_url or youtube_url):
+        flash("至少要留點文字、一張圖片，或一個 YouTube 連結")
+        return redirect(url_for("blog"))
+
+    db = get_db()
+    cur = run(
+        db,
+        "INSERT INTO blog_posts "
+        "(sender_id, content, image_url, youtube_url, youtube_title, youtube_thumbnail, created_at) "
+        "VALUES (?,?,?,?,?,?,?) RETURNING id",
+        (
+            current_user_id(), content or None, image_url,
+            youtube_url or None, youtube_title, youtube_thumb, now_str(),
+        ),
+    )
+    new_id = cur.fetchone()["id"]
+    db.commit()
+
+    me = fetch_user(current_user_id())
+    if content:
+        preview = content
+    elif youtube_url:
+        preview = "分享了一部影片"
+    else:
+        preview = "分享了一張照片"
+    send_push_to_user(other_id(current_user_id()), f"{me['name']} 發了新動態", preview, "/blog")
+
+    return redirect(url_for("blog"))
+
+
+@app.route("/blog/delete/<int:post_id>", methods=["POST"])
+def delete_blog_post(post_id):
+    db = get_db()
+    run(db, "DELETE FROM blog_comments WHERE post_id = ?", (post_id,))
+    run(db, "DELETE FROM blog_posts WHERE id = ?", (post_id,))
+    db.commit()
+    return redirect(url_for("blog"))
+
+
+@app.route("/blog/comment/<int:post_id>", methods=["POST"])
+def add_blog_comment(post_id):
+    comment_text = request.form.get("comment_text", "").strip()
+    if comment_text:
+        db = get_db()
+        run(
+            db,
+            "INSERT INTO blog_comments (post_id, sender_id, comment_text, created_at) VALUES (?,?,?,?)",
+            (post_id, current_user_id(), comment_text, now_str()),
+        )
+        db.commit()
+        me = fetch_user(current_user_id())
+        send_push_to_user(other_id(current_user_id()), f"{me['name']} 留言了", comment_text, "/blog")
+    return redirect(url_for("blog"))
 
 
 @app.route("/push/subscribe", methods=["POST"])

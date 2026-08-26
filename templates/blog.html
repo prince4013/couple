@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}動態 · 橘語{% endblock %}
+{% block content %}
+
+<p class="page-title">動態</p>
+
+<div class="card">
+  <p class="section-label">寫點什麼</p>
+  <form action="{{ url_for('new_blog_post') }}" method="post" enctype="multipart/form-data" class="blog-new-form">
+    <textarea name="content" placeholder="今天的心情、想說的話..." rows="3"></textarea>
+
+    <label class="memory-upload-btn" id="blog-upload-label">
+      <i class="ti ti-photo-plus"></i> <span id="blog-upload-text">加一張照片（選填）</span>
+      <input type="file" name="image" id="blog-image-input" accept="image/*" onchange="previewBlogImage(event)">
+    </label>
+    <img id="blog-preview" class="memory-preview" style="display:none;" alt="照片預覽">
+
+    <input type="url" name="youtube_url" placeholder="貼上 YouTube 連結（選填）">
+
+    <button type="submit" class="save-btn">發佈</button>
+  </form>
+</div>
+
+<script>
+function previewBlogImage(event) {
+  const file = event.target.files && event.target.files[0];
+  const preview = document.getElementById('blog-preview');
+  const label = document.getElementById('blog-upload-text');
+  if (file) {
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+    label.textContent = '已選擇：' + file.name;
+  } else {
+    preview.style.display = 'none';
+    label.textContent = '加一張照片（選填）';
+  }
+}
+</script>
+
+<div class="blog-feed">
+  {% for post in posts %}
+  <div class="blog-post-card" id="post-{{ post['id'] }}">
+    <div class="blog-post-header">
+      <div class="avatar" style="width:32px;height:32px;font-size:13px;background:{{ '#D85A30' if post['sender_id']=='a' else '#EF9F27' }}">
+        {{ user_names[post['sender_id']][0] }}
+      </div>
+      <div>
+        <p class="blog-author">{{ user_names[post['sender_id']] }}</p>
+        <p class="blog-time">{{ post['created_at'][5:16] }}</p>
+      </div>
+      <form action="{{ url_for('delete_blog_post', post_id=post['id']) }}" method="post"
+            onsubmit="return confirm('確定要刪除這篇動態嗎？');" style="margin-left:auto;">
+        <button type="submit" class="timeline-delete-btn"><i class="ti ti-trash"></i></button>
+      </form>
+    </div>
+
+    {% if post['content'] %}
+    <p class="blog-content">{{ post['content'] }}</p>
+    {% endif %}
+
+    {% if post['image_url'] %}
+    <img src="{{ post['image_url'] }}" class="blog-image" alt="貼文照片">
+    {% endif %}
+
+    {% if post['youtube_url'] %}
+    <a href="{{ post['youtube_url'] }}" target="_blank" rel="noopener" class="yt-preview">
+      <div class="yt-thumb-wrap">
+        {% if post['youtube_thumbnail'] %}
+        <img src="{{ post['youtube_thumbnail'] }}" class="yt-thumb" alt="YouTube 縮圖">
+        {% endif %}
+        <span class="yt-play-icon"><i class="ti ti-player-play-filled"></i></span>
+      </div>
+      <div class="yt-info">
+        <p class="yt-title">{{ post['youtube_title'] or 'YouTube 影片' }}</p>
+        <p class="yt-domain"><i class="ti ti-brand-youtube"></i> youtube.com</p>
+      </div>
+    </a>
+    {% endif %}
+
+    <div class="blog-comments">
+      {% for c in comments_by_post.get(post['id'], []) %}
+      <div class="blog-comment-row">
+        <span class="blog-comment-author">{{ user_names[c['sender_id']] }}</span>
+        <span class="blog-comment-text">{{ c['comment_text'] }}</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <form action="{{ url_for('add_blog_comment', post_id=post['id']) }}" method="post" class="blog-comment-form">
+      <input type="text" name="comment_text" placeholder="留言...">
+      <button type="submit"><i class="ti ti-send"></i></button>
+    </form>
+  </div>
+  {% else %}
+  <p class="empty-hint">還沒有任何動態，寫下第一篇吧</p>
+  {% endfor %}
+</div>
+
+{% endblock %}
