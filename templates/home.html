@@ -20,8 +20,20 @@
 <div class="countdown-card">
   <p class="countdown-label">距離見面還有</p>
   {% if days_left is not none %}
-    <p class="countdown-days">{{ days_left }} <span>天</span></p>
+    <p class="countdown-days">
+      {% if weeks_left and weeks_left > 0 %}
+      {{ weeks_left }}<span>週</span>{{ weeks_remaining_days }}<span>天</span>
+      {% else %}
+      {{ days_left }}<span>天</span>
+      {% endif %}
+    </p>
     <p class="countdown-date">{{ meeting_date }} 見面</p>
+    {% if progress_percent is not none %}
+    <div class="countdown-progress-track">
+      <div class="countdown-progress-fill" style="width: {{ progress_percent }}%;"></div>
+    </div>
+    <p class="countdown-progress-label">已經走過 {{ progress_percent }}% 的等待時光</p>
+    {% endif %}
   {% else %}
     <p class="countdown-days">--</p>
     <p class="countdown-date">尚未設定見面日期，請到設定頁新增</p>

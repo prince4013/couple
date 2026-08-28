@@ -269,6 +269,19 @@ def init_db():
     ensure_column("blog_posts", "link_is_youtube", "INTEGER")
     conn.commit()
 
+    # 幫已經存在的舊資料庫補上進度條起點：如果已經有見面日期，卻還沒有
+    # countdown_start_date，就用今天當起點（新資料庫在上面已經種好了，這裡不會重複跑）。
+    cur.execute(f"SELECT value FROM settings WHERE key = {ph}", ("meeting_date",))
+    has_meeting_date = cur.fetchone() is not None
+    cur.execute(f"SELECT value FROM settings WHERE key = {ph}", ("countdown_start_date",))
+    has_start_date = cur.fetchone() is not None
+    if has_meeting_date and not has_start_date:
+        cur.execute(
+            f"INSERT INTO settings VALUES ({ph}, {ph})",
+            ("countdown_start_date", date.today().isoformat()),
+        )
+        conn.commit()
+
     cur.execute("SELECT COUNT(*) FROM users")
     user_count = cur.fetchone()[0]
 
@@ -285,6 +298,10 @@ def init_db():
         cur.execute(
             f"INSERT INTO settings VALUES ({ph}, {ph})",
             ("meeting_date", "2026-12-18"),
+        )
+        cur.execute(
+            f"INSERT INTO settings VALUES ({ph}, {ph})",
+            ("countdown_start_date", date.today().isoformat()),
         )
 
         ts = now_str()
@@ -571,12 +588,28 @@ def home():
 
     meeting_date_str = get_setting("meeting_date")
     days_left = None
+    weeks_left, weeks_remaining_days = None, None
+    progress_percent = None
     if meeting_date_str:
         try:
             m_date = date.fromisoformat(meeting_date_str)
             days_left = (m_date - date.today()).days
+            weeks_left, weeks_remaining_days = divmod(max(days_left, 0), 7)
         except ValueError:
             days_left = None
+
+        start_date_str = get_setting("countdown_start_date")
+        if start_date_str:
+            try:
+                start_date = date.fromisoformat(start_date_str)
+                total_days = (m_date - start_date).days
+                elapsed_days = (date.today() - start_date).days
+                if total_days > 0:
+                    progress_percent = max(0, min(100, round(elapsed_days / total_days * 100)))
+                else:
+                    progress_percent = 100
+            except ValueError:
+                progress_percent = None
 
     db = get_db()
     recent_gifts = run(db, "SELECT * FROM gifts ORDER BY id DESC LIMIT 5").fetchall()
@@ -593,6 +626,9 @@ def home():
         partner_time=partner_time,
         partner_weather=partner_weather,
         days_left=days_left,
+        weeks_left=weeks_left,
+        weeks_remaining_days=weeks_remaining_days,
+        progress_percent=progress_percent,
         meeting_date=meeting_date_str,
         recent_gifts=recent_gifts,
         latest_question=latest_question,
@@ -1038,6 +1074,10 @@ def settings():
     if request.method == "POST":
         meeting_date = request.form.get("meeting_date", "").strip()
         if meeting_date:
+            old_meeting_date = get_setting("meeting_date")
+            if meeting_date != old_meeting_date:
+                # 見面日期改變了，進度條要從今天重新算起，不然百分比會亂跳
+                set_setting("countdown_start_date", date.today().isoformat())
             set_setting("meeting_date", meeting_date)
 
         for uid in ("a", "b"):
