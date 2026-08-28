@@ -269,16 +269,20 @@ def init_db():
     ensure_column("blog_posts", "link_is_youtube", "INTEGER")
     conn.commit()
 
-    # 幫已經存在的舊資料庫補上進度條起點：如果已經有見面日期，卻還沒有
-    # countdown_start_date，就用今天當起點（新資料庫在上面已經種好了，這裡不會重複跑）。
-    cur.execute(f"SELECT value FROM settings WHERE key = {ph}", ("meeting_date",))
-    has_meeting_date = cur.fetchone() is not None
-    cur.execute(f"SELECT value FROM settings WHERE key = {ph}", ("countdown_start_date",))
-    has_start_date = cur.fetchone() is not None
-    if has_meeting_date and not has_start_date:
+    # 把進度條起點設成指定的日期（2026-07-26）。用一個遷移旗標確保這件事
+    # 只在第一次套用這次更新時強制蓋過去一次，之後如果使用者自己在設定頁
+    # 改了見面日期、觸發了自動重設，就不會被這裡的邏輯再蓋回去。
+    cur.execute(f"SELECT value FROM settings WHERE key = {ph}", ("countdown_start_migrated_20260726",))
+    already_migrated = cur.fetchone() is not None
+    if not already_migrated:
+        cur.execute(
+            "INSERT INTO settings (key, value) VALUES "
+            f"({ph}, {ph}) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            ("countdown_start_date", "2026-07-26"),
+        )
         cur.execute(
             f"INSERT INTO settings VALUES ({ph}, {ph})",
-            ("countdown_start_date", date.today().isoformat()),
+            ("countdown_start_migrated_20260726", "1"),
         )
         conn.commit()
 
@@ -298,10 +302,6 @@ def init_db():
         cur.execute(
             f"INSERT INTO settings VALUES ({ph}, {ph})",
             ("meeting_date", "2026-12-18"),
-        )
-        cur.execute(
-            f"INSERT INTO settings VALUES ({ph}, {ph})",
-            ("countdown_start_date", date.today().isoformat()),
         )
 
         ts = now_str()
