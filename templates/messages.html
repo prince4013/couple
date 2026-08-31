@@ -45,10 +45,13 @@
 </form>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+function scrollMessagesToEnd() {
   var end = document.getElementById('message-thread-end');
-  if (end) { end.scrollIntoView({ behavior: 'instant', block: 'end' }); }
-});
+  if (end) { end.scrollIntoView({ behavior: 'auto', block: 'end' }); }
+  window.scrollTo(0, document.body.scrollHeight);
+}
+document.addEventListener('DOMContentLoaded', scrollMessagesToEnd);
+window.addEventListener('load', scrollMessagesToEnd);
 </script>
 
 {% endblock %}

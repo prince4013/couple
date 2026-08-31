@@ -629,7 +629,7 @@ def home():
         gift = dict(g)
         loc = LOCATIONS.get(gift["sender_id"], {})
         time_str = format_local_time_short(gift["created_at"], loc.get("timezone", "UTC"))
-        gift["local_time_display"] = f"{loc.get('city', '')}{time_str}"
+        gift["local_time_display"] = f"{loc.get('city', '')} {time_str}"
         recent_gifts.append(gift)
     latest_question = run(db, "SELECT * FROM questions ORDER BY id DESC LIMIT 1").fetchone()
 
