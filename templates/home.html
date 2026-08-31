@@ -22,9 +22,9 @@
   {% if days_left is not none %}
     <p class="countdown-days">
       {% if weeks_left and weeks_left > 0 %}
-      {{ weeks_left }}<span>週</span>{{ weeks_remaining_days }}<span>天</span>
+      {{ weeks_left }}<span class="unit-week">週</span><span class="days-part">{{ weeks_remaining_days }}<span class="unit-day">天</span></span>
       {% else %}
-      {{ days_left }}<span>天</span>
+      {{ days_left }}<span class="unit-day">天</span>
       {% endif %}
     </p>
     <p class="countdown-date">{{ meeting_date }} 見面</p>
@@ -58,7 +58,7 @@
   <div class="gift-feed-item">
     <i class="ti {{ gift_labels[gft['gift_type']][1] }}"></i>
     <span>{{ user_names[gft['sender_id']] }} 送出了「{{ gift_labels[gft['gift_type']][0] }}」</span>
-    <span class="gift-time">{{ gft['created_at'][5:16] }}</span>
+    <span class="gift-time">{{ gft.local_time_display }}</span>
   </div>
   {% endfor %}
 </div>

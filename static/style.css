@@ -68,7 +68,7 @@ body {
 .partner-weather { margin: 2px 0 0; font-size: 12px; color: #854F0B; }
 .status-pill {
   font-size: 11px; padding: 4px 10px; border-radius: 999px;
-  background: #F0997B; color: #4A1B0C; white-space: nowrap;
+  background: #F0997B; color: #fff; white-space: nowrap;
 }
 
 .miss-you-btn {
@@ -86,7 +86,9 @@ body {
 }
 .countdown-label { margin: 0; font-size: 12px; color: #4A1B0C; }
 .countdown-days { margin: 2px 0; font-size: 30px; font-weight: 700; color: #4A1B0C; }
-.countdown-days span { font-size: 14px; margin: 0 4px 0 2px; }
+.countdown-days .unit-week { font-size: 14px; margin: 0 4px 0 2px; }
+.countdown-days .days-part { font-size: 16px; font-weight: 500; margin-left: 6px; }
+.countdown-days .unit-day { font-size: 12px; margin-left: 1px; }
 .countdown-date { margin: 0; font-size: 12px; color: #712B13; }
 
 .countdown-progress-track {
@@ -97,7 +99,7 @@ body {
   height: 100%; border-radius: 999px; background: #D85A30;
   transition: width 0.3s ease;
 }
-.countdown-progress-label { margin: 6px 0 0; font-size: 11px; color: #712B13; }
+.countdown-progress-label { margin: 6px 0 0; font-size: 11px; color: #fff; }
 
 .gift-row { display: flex; gap: 8px; margin-bottom: 14px; }
 .gift-form { flex: 1; }

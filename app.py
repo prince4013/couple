@@ -50,7 +50,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
 app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024  # 8MB 上限
 
 GIFT_LABELS = {
-    "heart": ("愛心", "ti-heart"),
+    "heart": ("抱抱", "ti-heart-handshake"),
     "cake": ("蛋糕", "ti-cake"),
     "coffee": ("咖啡", "ti-coffee"),
     "bouquet": ("花束", "ti-flower"),
@@ -337,7 +337,18 @@ def init_db():
 
 
 def now_str():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    """統一用 UTC 時間存進資料庫，之後要顯示成任何人的當地時間都可以準確換算。"""
+    return datetime.now(ZoneInfo("UTC")).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def format_local_time_short(created_at_str, timezone_name):
+    """把用 now_str() 存的 UTC 時間字串，轉成指定時區的『MM-DD，HH:MM』(24 小時制)。"""
+    try:
+        dt_utc = datetime.strptime(created_at_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=ZoneInfo("UTC"))
+        dt_local = dt_utc.astimezone(ZoneInfo(timezone_name))
+        return dt_local.strftime("%m-%d，%H:%M")
+    except (ValueError, TypeError):
+        return created_at_str[5:16] if created_at_str else ""
 
 
 def fetch_user(uid):
@@ -612,7 +623,14 @@ def home():
                 progress_percent = None
 
     db = get_db()
-    recent_gifts = run(db, "SELECT * FROM gifts ORDER BY id DESC LIMIT 5").fetchall()
+    recent_gifts_raw = run(db, "SELECT * FROM gifts ORDER BY id DESC LIMIT 5").fetchall()
+    recent_gifts = []
+    for g in recent_gifts_raw:
+        gift = dict(g)
+        loc = LOCATIONS.get(gift["sender_id"], {})
+        time_str = format_local_time_short(gift["created_at"], loc.get("timezone", "UTC"))
+        gift["local_time_display"] = f"{loc.get('city', '')}{time_str}"
+        recent_gifts.append(gift)
     latest_question = run(db, "SELECT * FROM questions ORDER BY id DESC LIMIT 1").fetchone()
 
     status_options = run(

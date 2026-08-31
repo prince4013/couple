@@ -33,6 +33,7 @@
   <p class="empty-hint">還沒有留言，跟對方說句話吧</p>
   {% endfor %}
 </div>
+<div id="message-thread-end"></div>
 
 <form action="{{ url_for('messages') }}" method="post" enctype="multipart/form-data" class="message-input-bar">
   <label class="upload-btn">
@@ -42,5 +43,12 @@
   <input type="text" name="text" placeholder="留言給對方...">
   <button type="submit"><i class="ti ti-send"></i></button>
 </form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var end = document.getElementById('message-thread-end');
+  if (end) { end.scrollIntoView({ behavior: 'instant', block: 'end' }); }
+});
+</script>
 
 {% endblock %}
