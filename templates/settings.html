@@ -31,15 +31,4 @@
   <button id="push-btn" type="button" class="save-btn">啟用想你了 / 留言通知</button>
 </div>
 
-<div class="card">
-  <p class="section-label">資料清除</p>
-  <form
-    action="{{ url_for('clear_gifts') }}"
-    method="post"
-    onsubmit="return confirm('確定要清除所有「最近的禮物」記錄嗎？這個動作無法復原。');"
-  >
-    <button type="submit" class="danger-btn">清除「最近的禮物」記錄</button>
-  </form>
-</div>
-
 {% endblock %}

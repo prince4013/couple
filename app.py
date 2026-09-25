@@ -51,7 +51,7 @@ app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024  # 8MB 上限
 
 GIFT_LABELS = {
     "heart": ("抱抱", "ti-heart-handshake"),
-    "kiss": ("親親", "ti-mood-kiss"),
+    "kiss": ("親親", "ti-feather"),
     "cake": ("蛋糕", "ti-cake"),
     "coffee": ("咖啡", "ti-coffee"),
     "bouquet": ("花束", "ti-flower"),
@@ -725,15 +725,6 @@ def send_gift(gift_type):
     return redirect(url_for("home"))
 
 
-@app.route("/gifts/clear", methods=["POST"])
-def clear_gifts():
-    db = get_db()
-    run(db, "DELETE FROM gifts")
-    db.commit()
-    flash("已清除「最近的禮物」記錄")
-    return redirect(url_for("settings"))
-
-
 @app.route("/messages", methods=["GET", "POST"])
 def messages():
     if request.method == "POST":
@@ -860,6 +851,24 @@ def add_question_reply(qid):
         db.commit()
         me = fetch_user(current_user_id())
         send_push_to_user(other_id(current_user_id()), f"{me['name']} 回覆了小問題", reply_text, "/whispers")
+    return redirect(url_for("whispers"))
+
+
+@app.route("/questions/reply/edit/<int:reply_id>", methods=["POST"])
+def edit_question_reply(reply_id):
+    reply_text = request.form.get("reply_text", "").strip()
+    if reply_text:
+        db = get_db()
+        run(db, "UPDATE question_replies SET reply_text = ? WHERE id = ?", (reply_text, reply_id))
+        db.commit()
+    return redirect(url_for("whispers"))
+
+
+@app.route("/questions/reply/delete/<int:reply_id>", methods=["POST"])
+def delete_question_reply(reply_id):
+    db = get_db()
+    run(db, "DELETE FROM question_replies WHERE id = ?", (reply_id,))
+    db.commit()
     return redirect(url_for("whispers"))
 
 
