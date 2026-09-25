@@ -65,7 +65,7 @@
 {% endif %}
 
 {% if latest_question %}
-<a href="{{ url_for('question_thread', qid=latest_question['id']) }}" class="question-preview">
+<a href="{{ url_for('whispers') }}#question-{{ latest_question['id'] }}" class="question-preview">
   <i class="ti ti-message-2-question"></i>
   <div class="question-preview-text">
     <p class="q-label">最新小問題</p>

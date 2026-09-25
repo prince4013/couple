@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}悄悄話 · 橘語{% endblock %}
+{% block content %}
+
+{% macro question_block(q) %}
+<div class="question-block" id="question-{{ q.id }}">
+  <div class="question-header">
+    <span class="q-meta">{{ role_labels[q.asker_id] }}提問 · {{ q.created_at[5:16] }}</span>
+    <div class="entry-actions">
+      <button type="button" class="entry-action-btn" onclick="toggleEdit('question', {{ q.id }})">
+        <i class="ti ti-pencil"></i> 編輯
+      </button>
+      <form
+        action="{{ url_for('delete_question', question_id=q.id) }}"
+        method="post"
+        onsubmit="return confirm('確定要刪除這個問題嗎？回覆也會一起刪除。');"
+      >
+        <button type="submit" class="entry-action-btn"><i class="ti ti-trash"></i> 刪除</button>
+      </form>
+    </div>
+  </div>
+
+  <p class="question-text" id="question-view-{{ q.id }}">{{ q.question_text }}</p>
+  <form
+    id="question-edit-{{ q.id }}"
+    action="{{ url_for('edit_question', question_id=q.id) }}"
+    method="post"
+    class="inline-edit-form"
+    style="display:none;"
+  >
+    <input type="text" name="question_text" value="{{ q.question_text }}">
+    <button type="submit"><i class="ti ti-check"></i></button>
+  </form>
+
+  {% if q.replies %}
+  <div class="reply-list">
+    {% for r in q.replies %}
+    <div class="reply-row">
+      <span class="reply-author">{{ role_labels[r.sender_id] }}</span>
+      <span class="reply-text">{{ r.reply_text }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <form action="{{ url_for('add_question_reply', qid=q.id) }}" method="post" class="reply-form">
+    <input type="text" name="reply_text" placeholder="回覆這個問題...">
+    <button type="submit"><i class="ti ti-send"></i></button>
+  </form>
+</div>
+{% endmacro %}
+
+<p class="page-title">悄悄話</p>
+
+<div class="card whisper-card">
+  <p class="section-label">問對方一個小問題</p>
+  <form action="{{ url_for('new_question') }}" method="post" class="new-question-form">
+    <input type="text" name="question_text" placeholder="例如：最近讓你最有安全感的一件事？" required>
+    <button type="submit">提問</button>
+  </form>
+
+  {% if latest_question %}
+  {{ question_block(latest_question) }}
+  {% else %}
+  <p class="empty-hint">還沒有小問題，先問對方一個吧</p>
+  {% endif %}
+
+  {% if past_questions %}
+  <details class="past-questions">
+    <summary>過去的問題（{{ past_questions|length }}）</summary>
+    {% for q in past_questions %}
+    {{ question_block(q) }}
+    {% endfor %}
+  </details>
+  {% endif %}
+</div>
+
+<div class="card whisper-card">
+  <p class="section-label">想讓對方知道的事</p>
+  <form action="{{ url_for('new_partner_note') }}" method="post" class="new-note-form">
+    <textarea
+      name="content" rows="3" required
+      placeholder="想讓對方知道的一件事、一個期望、一句想說的話..."
+    ></textarea>
+    <button type="submit" class="save-btn">送出</button>
+  </form>
+
+  <div class="note-list">
+    {% for n in notes %}
+    <div class="note-card">
+      <div class="note-header">
+        <span class="note-role">{{ role_labels[n.sender_id] }}的期望</span>
+        <span class="note-time">{{ n.created_at[5:16] }}</span>
+      </div>
+
+      <p class="note-content" id="note-view-{{ n.id }}">{{ n.content }}</p>
+      <form
+        id="note-edit-{{ n.id }}"
+        action="{{ url_for('edit_partner_note', note_id=n.id) }}"
+        method="post"
+        class="inline-edit-form"
+        style="display:none;"
+      >
+        <input type="text" name="content" value="{{ n.content }}">
+        <button type="submit"><i class="ti ti-check"></i></button>
+      </form>
+
+      <div class="note-footer">
+        <div class="entry-actions">
+          <button type="button" class="entry-action-btn" onclick="toggleEdit('note', {{ n.id }})">
+            <i class="ti ti-pencil"></i> 編輯
+          </button>
+          <form
+            action="{{ url_for('delete_partner_note', note_id=n.id) }}"
+            method="post"
+            onsubmit="return confirm('確定要刪除這則嗎？');"
+          >
+            <button type="submit" class="entry-action-btn"><i class="ti ti-trash"></i> 刪除</button>
+          </form>
+        </div>
+
+        {% if n.sender_id != me_id %}
+        <form action="{{ url_for('toggle_note_heart', note_id=n.id) }}" method="post">
+          <button type="submit" class="note-heart-btn {{ 'filled' if n.is_acknowledged else '' }}">
+            <i class="ti {{ 'ti-heart-filled' if n.is_acknowledged else 'ti-heart' }}"></i>
+          </button>
+        </form>
+        {% elif n.is_acknowledged %}
+        <span class="note-heart-btn filled seen"><i class="ti ti-heart-filled"></i></span>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <p class="empty-hint">還沒有想讓對方知道的事</p>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+function toggleEdit(prefix, id) {
+  var view = document.getElementById(prefix + '-view-' + id);
+  var form = document.getElementById(prefix + '-edit-' + id);
+  if (form.style.display === 'none') {
+    form.style.display = 'flex';
+    view.style.display = 'none';
+  } else {
+    form.style.display = 'none';
+    view.style.display = 'block';
+  }
+}
+</script>
+
+{% endblock %}

@@ -51,11 +51,15 @@ app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024  # 8MB 上限
 
 GIFT_LABELS = {
     "heart": ("抱抱", "ti-heart-handshake"),
+    "kiss": ("親親", "ti-mood-kiss"),
     "cake": ("蛋糕", "ti-cake"),
     "coffee": ("咖啡", "ti-coffee"),
     "bouquet": ("花束", "ti-flower"),
     "miss_you": ("想你了", "ti-heart-filled"),
 }
+
+# 固定的角色稱呼（跟身分切換按鈕的文字一致，不隨暱稱變動）
+ROLE_LABELS = {"a": "老婆", "b": "老公"}
 
 # 固定雙方地點（依需求直接寫死，不再開放編輯）
 LOCATIONS = {
@@ -238,6 +242,15 @@ def init_db():
             comment_text TEXT NOT NULL,
             created_at TEXT NOT NULL,
             FOREIGN KEY (post_id) REFERENCES blog_posts(id)
+        )
+        """,
+        f"""
+        CREATE TABLE IF NOT EXISTS partner_notes (
+            id {id_type},
+            sender_id TEXT NOT NULL,
+            content TEXT NOT NULL,
+            is_acknowledged INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL
         )
         """,
         """
@@ -566,6 +579,7 @@ def inject_globals():
         "me_id": current_user_id(),
         "gift_labels": GIFT_LABELS,
         "user_names": {"a": a["name"], "b": b["name"]},
+        "role_labels": ROLE_LABELS,
         "push_enabled": PUSH_ENABLED,
         "vapid_public_key": VAPID_PUBLIC_KEY,
     }
@@ -774,19 +788,28 @@ def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXT
 
 
-@app.route("/questions")
-def questions():
+@app.route("/whispers")
+def whispers():
     db = get_db()
-    rows = run(
-        db,
-        """
-        SELECT q.*,
-               (SELECT COUNT(*) FROM question_replies r WHERE r.question_id = q.id) AS reply_count
-        FROM questions q
-        ORDER BY q.id DESC
-        """,
-    ).fetchall()
-    return render_template("questions.html", threads=rows)
+    questions_raw = run(db, "SELECT * FROM questions ORDER BY id DESC").fetchall()
+    all_questions = []
+    for q in questions_raw:
+        question = dict(q)
+        question["replies"] = run(
+            db, "SELECT * FROM question_replies WHERE question_id = ? ORDER BY id ASC", (q["id"],)
+        ).fetchall()
+        all_questions.append(question)
+    latest_question = all_questions[0] if all_questions else None
+    past_questions = all_questions[1:] if len(all_questions) > 1 else []
+
+    notes = run(db, "SELECT * FROM partner_notes ORDER BY id DESC").fetchall()
+
+    return render_template(
+        "whispers.html",
+        latest_question=latest_question,
+        past_questions=past_questions,
+        notes=notes,
+    )
 
 
 @app.route("/questions/new", methods=["POST"])
@@ -794,47 +817,94 @@ def new_question():
     text = request.form.get("question_text", "").strip()
     if text:
         db = get_db()
-        cur = run(
+        run(
             db,
-            "INSERT INTO questions (asker_id, question_text, created_at) VALUES (?,?,?) RETURNING id",
+            "INSERT INTO questions (asker_id, question_text, created_at) VALUES (?,?,?)",
             (current_user_id(), text, now_str()),
         )
-        new_id = cur.fetchone()["id"]
+        db.commit()
+        me = fetch_user(current_user_id())
+        send_push_to_user(other_id(current_user_id()), f"{me['name']} 問了你一個小問題", text, "/whispers")
+    return redirect(url_for("whispers"))
+
+
+@app.route("/questions/edit/<int:question_id>", methods=["POST"])
+def edit_question(question_id):
+    text = request.form.get("question_text", "").strip()
+    if text:
+        db = get_db()
+        run(db, "UPDATE questions SET question_text = ? WHERE id = ?", (text, question_id))
+        db.commit()
+    return redirect(url_for("whispers"))
+
+
+@app.route("/questions/delete/<int:question_id>", methods=["POST"])
+def delete_question(question_id):
+    db = get_db()
+    run(db, "DELETE FROM question_replies WHERE question_id = ?", (question_id,))
+    run(db, "DELETE FROM questions WHERE id = ?", (question_id,))
+    db.commit()
+    return redirect(url_for("whispers"))
+
+
+@app.route("/questions/<int:qid>/reply", methods=["POST"])
+def add_question_reply(qid):
+    reply_text = request.form.get("reply_text", "").strip()
+    if reply_text:
+        db = get_db()
+        run(
+            db,
+            "INSERT INTO question_replies (question_id, sender_id, reply_text, created_at) VALUES (?,?,?,?)",
+            (qid, current_user_id(), reply_text, now_str()),
+        )
+        db.commit()
+        me = fetch_user(current_user_id())
+        send_push_to_user(other_id(current_user_id()), f"{me['name']} 回覆了小問題", reply_text, "/whispers")
+    return redirect(url_for("whispers"))
+
+
+@app.route("/notes/new", methods=["POST"])
+def new_partner_note():
+    content = request.form.get("content", "").strip()
+    if content:
+        db = get_db()
+        run(
+            db,
+            "INSERT INTO partner_notes (sender_id, content, is_acknowledged, created_at) VALUES (?,?,0,?)",
+            (current_user_id(), content, now_str()),
+        )
         db.commit()
         me = fetch_user(current_user_id())
         send_push_to_user(
-            other_id(current_user_id()), f"{me['name']} 問了你一個小問題", text, f"/questions/{new_id}"
+            other_id(current_user_id()), f"{me['name']} 想讓你知道一件事", content, "/whispers"
         )
-        return redirect(url_for("question_thread", qid=new_id))
-    return redirect(url_for("questions"))
+    return redirect(url_for("whispers"))
 
 
-@app.route("/questions/<int:qid>", methods=["GET", "POST"])
-def question_thread(qid):
+@app.route("/notes/edit/<int:note_id>", methods=["POST"])
+def edit_partner_note(note_id):
+    content = request.form.get("content", "").strip()
+    if content:
+        db = get_db()
+        run(db, "UPDATE partner_notes SET content = ? WHERE id = ?", (content, note_id))
+        db.commit()
+    return redirect(url_for("whispers"))
+
+
+@app.route("/notes/delete/<int:note_id>", methods=["POST"])
+def delete_partner_note(note_id):
     db = get_db()
-    if request.method == "POST":
-        reply_text = request.form.get("reply_text", "").strip()
-        if reply_text:
-            run(
-                db,
-                "INSERT INTO question_replies (question_id, sender_id, reply_text, created_at) VALUES (?,?,?,?)",
-                (qid, current_user_id(), reply_text, now_str()),
-            )
-            db.commit()
-            me = fetch_user(current_user_id())
-            send_push_to_user(
-                other_id(current_user_id()), f"{me['name']} 回覆了小問題", reply_text, f"/questions/{qid}"
-            )
-        return redirect(url_for("question_thread", qid=qid))
+    run(db, "DELETE FROM partner_notes WHERE id = ?", (note_id,))
+    db.commit()
+    return redirect(url_for("whispers"))
 
-    question = run(db, "SELECT * FROM questions WHERE id = ?", (qid,)).fetchone()
-    if question is None:
-        flash("找不到這個問題")
-        return redirect(url_for("questions"))
-    replies = run(
-        db, "SELECT * FROM question_replies WHERE question_id = ? ORDER BY id ASC", (qid,)
-    ).fetchall()
-    return render_template("question_thread.html", question=question, replies=replies)
+
+@app.route("/notes/heart/<int:note_id>", methods=["POST"])
+def toggle_note_heart(note_id):
+    db = get_db()
+    run(db, "UPDATE partner_notes SET is_acknowledged = 1 - is_acknowledged WHERE id = ?", (note_id,))
+    db.commit()
+    return redirect(url_for("whispers"))
 
 
 @app.route("/checklist")

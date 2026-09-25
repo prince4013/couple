@@ -26,9 +26,9 @@
   <div class="statusbar">
     <span>{{ now_display if now_display else '' }}</span>
     <div class="identity-switch">
-      目前身分：
-      <a href="{{ url_for('switch', uid='a') }}" class="{{ 'active' if me_id=='a' else '' }}">我是老婆</a> /
-      <a href="{{ url_for('switch', uid='b') }}" class="{{ 'active' if me_id=='b' else '' }}">我是老公</a>
+      <span class="identity-label">身分</span>
+      <a href="{{ url_for('switch', uid='a') }}" class="{{ 'active' if me_id=='a' else '' }}">我是{{ role_labels['a'] }}</a>
+      <a href="{{ url_for('switch', uid='b') }}" class="{{ 'active' if me_id=='b' else '' }}">我是{{ role_labels['b'] }}</a>
     </div>
   </div>
 
@@ -45,8 +45,8 @@
   </main>
 
   <nav class="bottom-nav">
-    <a href="{{ url_for('questions') }}" class="{{ 'active' if request.endpoint in ['questions','question_thread'] else '' }}">
-      <i class="ti ti-message-2-question"></i><span>小問題</span>
+    <a href="{{ url_for('whispers') }}" class="{{ 'active' if request.endpoint=='whispers' else '' }}">
+      <i class="ti ti-messages"></i><span>悄悄話</span>
     </a>
     <a href="{{ url_for('messages') }}" class="{{ 'active' if request.endpoint=='messages' else '' }}">
       <i class="ti ti-message-circle"></i><span>留言</span>
