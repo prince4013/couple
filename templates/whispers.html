@@ -115,65 +115,77 @@
   {% endif %}
 </div>
 
+{% macro note_card(n) %}
+<div class="note-card">
+  <p class="note-time">{{ n.created_at[5:16] }}</p>
+
+  <p class="note-content" id="note-view-{{ n.id }}">{{ n.content }}</p>
+  <form
+    id="note-edit-{{ n.id }}"
+    action="{{ url_for('edit_partner_note', note_id=n.id) }}"
+    method="post"
+    class="inline-edit-form"
+    style="display:none;"
+  >
+    <input type="text" name="content" value="{{ n.content }}">
+    <button type="submit"><i class="ti ti-check"></i></button>
+  </form>
+
+  <div class="note-footer">
+    <div class="entry-actions">
+      <button type="button" class="entry-action-btn" onclick="toggleEdit('note', {{ n.id }})">
+        <i class="ti ti-pencil"></i> 編輯
+      </button>
+      <form
+        action="{{ url_for('delete_partner_note', note_id=n.id) }}"
+        method="post"
+        onsubmit="return confirm('確定要刪除這則嗎？');"
+      >
+        <button type="submit" class="entry-action-btn"><i class="ti ti-trash"></i> 刪除</button>
+      </form>
+    </div>
+
+    {% if n.sender_id != me_id %}
+    <form action="{{ url_for('toggle_note_heart', note_id=n.id) }}" method="post">
+      <button type="submit" class="note-heart-btn {{ 'filled' if n.is_acknowledged else '' }}">
+        <i class="ti {{ 'ti-heart-filled' if n.is_acknowledged else 'ti-heart' }}"></i>
+      </button>
+    </form>
+    {% elif n.is_acknowledged %}
+    <span class="note-heart-btn filled seen"><i class="ti ti-heart-filled"></i></span>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}
+
 <div class="card whisper-card">
   <p class="section-label">想讓對方知道的事</p>
-  <form action="{{ url_for('new_partner_note') }}" method="post" class="new-note-form">
-    <textarea
-      name="content" rows="3" required
-      placeholder="想讓對方知道的一件事、一個期望、一句想說的話..."
-    ></textarea>
+  <form action="{{ url_for('new_partner_note') }}" method="post" class="new-question-form">
+    <input type="text" name="content" placeholder="想讓對方知道的一件事、一個期望、一句想說的話..." required>
     <button type="submit" class="accent-btn-sm">送出</button>
   </form>
 
-  <div class="note-list">
-    {% for n in notes %}
-    <div class="note-card">
-      <div class="note-header">
-        <span class="note-role">{{ user_names[n.sender_id] }}的期望</span>
-        <span class="note-time">{{ n.created_at[5:16] }}</span>
-      </div>
-
-      <p class="note-content" id="note-view-{{ n.id }}">{{ n.content }}</p>
-      <form
-        id="note-edit-{{ n.id }}"
-        action="{{ url_for('edit_partner_note', note_id=n.id) }}"
-        method="post"
-        class="inline-edit-form"
-        style="display:none;"
-      >
-        <input type="text" name="content" value="{{ n.content }}">
-        <button type="submit"><i class="ti ti-check"></i></button>
-      </form>
-
-      <div class="note-footer">
-        <div class="entry-actions">
-          <button type="button" class="entry-action-btn" onclick="toggleEdit('note', {{ n.id }})">
-            <i class="ti ti-pencil"></i> 編輯
-          </button>
-          <form
-            action="{{ url_for('delete_partner_note', note_id=n.id) }}"
-            method="post"
-            onsubmit="return confirm('確定要刪除這則嗎？');"
-          >
-            <button type="submit" class="entry-action-btn"><i class="ti ti-trash"></i> 刪除</button>
-          </form>
-        </div>
-
-        {% if n.sender_id != me_id %}
-        <form action="{{ url_for('toggle_note_heart', note_id=n.id) }}" method="post">
-          <button type="submit" class="note-heart-btn {{ 'filled' if n.is_acknowledged else '' }}">
-            <i class="ti {{ 'ti-heart-filled' if n.is_acknowledged else 'ti-heart' }}"></i>
-          </button>
-        </form>
-        {% elif n.is_acknowledged %}
-        <span class="note-heart-btn filled seen"><i class="ti ti-heart-filled"></i></span>
-        {% endif %}
-      </div>
+  <details class="note-group">
+    <summary>{{ user_names['a'] }}的期望（{{ notes_by_sender['a']|length }}）</summary>
+    {% if notes_by_sender['a'] %}
+    <div class="note-list">
+      {% for n in notes_by_sender['a'] %}{{ note_card(n) }}{% endfor %}
     </div>
     {% else %}
-    <p class="empty-hint">還沒有想讓對方知道的事</p>
-    {% endfor %}
-  </div>
+    <p class="empty-hint">還沒有</p>
+    {% endif %}
+  </details>
+
+  <details class="note-group">
+    <summary>{{ user_names['b'] }}的期望（{{ notes_by_sender['b']|length }}）</summary>
+    {% if notes_by_sender['b'] %}
+    <div class="note-list">
+      {% for n in notes_by_sender['b'] %}{{ note_card(n) }}{% endfor %}
+    </div>
+    {% else %}
+    <p class="empty-hint">還沒有</p>
+    {% endif %}
+  </details>
 </div>
 
 <script>

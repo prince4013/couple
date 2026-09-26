@@ -793,13 +793,17 @@ def whispers():
     latest_question = all_questions[0] if all_questions else None
     past_questions = all_questions[1:] if len(all_questions) > 1 else []
 
-    notes = run(db, "SELECT * FROM partner_notes ORDER BY id DESC").fetchall()
+    notes_raw = run(db, "SELECT * FROM partner_notes ORDER BY id DESC").fetchall()
+    notes_by_sender = {"a": [], "b": []}
+    for n in notes_raw:
+        note = dict(n)
+        notes_by_sender.setdefault(note["sender_id"], []).append(note)
 
     return render_template(
         "whispers.html",
         latest_question=latest_question,
         past_questions=past_questions,
-        notes=notes,
+        notes_by_sender=notes_by_sender,
     )
 
 

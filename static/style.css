@@ -276,20 +276,20 @@ body {
 .reply-collapse .reply-form { margin-top: 6px; }
 
 /* ---- 悄悄話：想讓對方知道的事 ---- */
-.new-note-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
-.new-note-form textarea {
-  padding: 10px; border-radius: 10px; border: 1px solid #F0E3C8; font-size: 13px;
-  font-family: inherit; resize: vertical;
+.note-group { margin-top: 4px; }
+.note-group summary {
+  cursor: pointer; font-size: 13px; color: #854F0B; font-weight: 700;
+  padding: 10px 0; border-top: 1px solid #F5EFE0;
 }
-.new-note-form .accent-btn-sm { align-self: flex-end; }
+.note-group summary::-webkit-details-marker { color: #D85A30; }
+.note-group .note-list { margin-top: 8px; }
+.note-group .empty-hint { margin: 8px 0; }
 
 .note-list { display: flex; flex-direction: column; gap: 10px; }
 .note-card {
   background: #fff; border: 1px solid #F0E3C8; border-radius: 12px; padding: 12px;
 }
-.note-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.note-role { font-size: 12px; font-weight: 700; color: #D85A30; }
-.note-time { font-size: 11px; color: #B4B2A9; }
+.note-time { font-size: 11px; color: #B4B2A9; margin: 0 0 4px; }
 .note-content { font-size: 14px; color: #412402; margin: 0 0 8px; white-space: pre-wrap; }
 .note-footer { display: flex; align-items: center; justify-content: space-between; }
 .note-heart-btn {
