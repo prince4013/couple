@@ -9,6 +9,13 @@
   <form action="{{ url_for('new_blog_post') }}" method="post" enctype="multipart/form-data" class="blog-new-form">
     <textarea name="content" placeholder="今天的心情、想說的話..." rows="3"></textarea>
 
+    <select name="category">
+      <option value="">不分類</option>
+      {% for key, label in blog_categories.items() %}
+      <option value="{{ key }}">{{ label }}</option>
+      {% endfor %}
+    </select>
+
     <label class="memory-upload-btn" id="blog-upload-label">
       <i class="ti ti-photo-plus"></i> <span id="blog-upload-text">加一張照片（選填）</span>
       <input type="file" name="image" id="blog-image-input" accept="image/*" onchange="previewBlogImage(event)">
@@ -19,6 +26,16 @@
 
     <button type="submit" class="save-btn">發佈</button>
   </form>
+</div>
+
+<div class="blog-filter-row">
+  <a href="{{ url_for('blog') }}" class="blog-filter-chip {{ 'active' if not selected_category else '' }}">全部</a>
+  {% for key, label in blog_categories.items() %}
+  <a
+    href="{{ url_for('blog', category=key) }}"
+    class="blog-filter-chip {{ 'active' if selected_category == key else '' }}"
+  >{{ label }}</a>
+  {% endfor %}
 </div>
 
 <script>
@@ -35,6 +52,18 @@ function previewBlogImage(event) {
     label.textContent = '加一張照片（選填）';
   }
 }
+
+function toggleEdit(prefix, id) {
+  var view = document.getElementById(prefix + '-view-' + id);
+  var form = document.getElementById(prefix + '-edit-' + id);
+  if (form.style.display === 'none') {
+    form.style.display = 'flex';
+    view.style.display = 'none';
+  } else {
+    form.style.display = 'none';
+    view.style.display = 'block';
+  }
+}
 </script>
 
 <div class="blog-feed">
@@ -48,15 +77,47 @@ function previewBlogImage(event) {
         <p class="blog-author">{{ user_names[post['sender_id']] }}</p>
         <p class="blog-time">{{ post['created_at'][5:16] }}</p>
       </div>
-      <form action="{{ url_for('delete_blog_post', post_id=post['id']) }}" method="post"
-            onsubmit="return confirm('確定要刪除這篇動態嗎？');" style="margin-left:auto;">
-        <button type="submit" class="timeline-delete-btn"><i class="ti ti-trash"></i></button>
-      </form>
+      <div class="entry-actions" style="margin-left:auto;">
+        <button type="button" class="entry-action-btn" onclick="toggleEdit('post', {{ post['id'] }})">
+          <i class="ti ti-pencil"></i>
+        </button>
+        <form
+          action="{{ url_for('delete_blog_post', post_id=post['id']) }}"
+          method="post"
+          onsubmit="return confirm('確定要刪除這篇動態嗎？');"
+        >
+          <button type="submit" class="entry-action-btn"><i class="ti ti-trash"></i></button>
+        </form>
+      </div>
     </div>
 
-    {% if post['content'] %}
-    <p class="blog-content">{{ post['content'] }}</p>
-    {% endif %}
+    <div id="post-view-{{ post['id'] }}">
+      {% if post.category_label %}
+      <span class="blog-category-tag">{{ post.category_label }}</span>
+      {% endif %}
+      {% if post['content'] %}
+      <p class="blog-content">{{ post['content'] }}</p>
+      {% endif %}
+    </div>
+
+    <form
+      id="post-edit-{{ post['id'] }}"
+      action="{{ url_for('edit_blog_post', post_id=post['id']) }}"
+      method="post"
+      class="post-edit-form"
+      style="display:none;"
+    >
+      <textarea name="content" rows="3">{{ post['content'] or '' }}</textarea>
+      <div class="post-edit-footer">
+        <select name="category">
+          <option value="">不分類</option>
+          {% for key, label in blog_categories.items() %}
+          <option value="{{ key }}" {{ 'selected' if post.get('category') == key else '' }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit"><i class="ti ti-check"></i> 儲存</button>
+      </div>
+    </form>
 
     {% if post['image_url'] %}
     <img src="{{ post['image_url'] }}" class="blog-image" alt="貼文照片">
@@ -91,8 +152,32 @@ function previewBlogImage(event) {
     <div class="blog-comments">
       {% for c in comments_by_post.get(post['id'], []) %}
       <div class="blog-comment-row">
-        <span class="blog-comment-author">{{ user_names[c['sender_id']] }}</span>
-        <span class="blog-comment-text">{{ c['comment_text'] }}</span>
+        <div class="blog-comment-row-top" id="comment-view-{{ c['id'] }}">
+          <span class="blog-comment-author">{{ user_names[c['sender_id']] }}</span>
+          <span class="blog-comment-text">{{ c['comment_text'] }}</span>
+        </div>
+        <div class="entry-actions blog-comment-actions">
+          <button type="button" class="entry-action-btn" onclick="toggleEdit('comment', {{ c['id'] }})">
+            <i class="ti ti-pencil"></i> 編輯
+          </button>
+          <form
+            action="{{ url_for('delete_blog_comment', comment_id=c['id']) }}"
+            method="post"
+            onsubmit="return confirm('確定要刪除這則留言嗎？');"
+          >
+            <button type="submit" class="entry-action-btn"><i class="ti ti-trash"></i> 刪除</button>
+          </form>
+        </div>
+        <form
+          id="comment-edit-{{ c['id'] }}"
+          action="{{ url_for('edit_blog_comment', comment_id=c['id']) }}"
+          method="post"
+          class="inline-edit-form"
+          style="display:none;"
+        >
+          <input type="text" name="comment_text" value="{{ c['comment_text'] }}">
+          <button type="submit"><i class="ti ti-check"></i></button>
+        </form>
       </div>
       {% endfor %}
     </div>
@@ -103,7 +188,9 @@ function previewBlogImage(event) {
     </form>
   </div>
   {% else %}
-  <p class="empty-hint">還沒有任何動態，寫下第一篇吧</p>
+  <p class="empty-hint">
+    {% if selected_category %}這個分類還沒有任何動態{% else %}還沒有任何動態，寫下第一篇吧{% endif %}
+  </p>
   {% endfor %}
 </div>
 

@@ -61,6 +61,14 @@ GIFT_LABELS = {
 # 固定的角色稱呼（跟身分切換按鈕的文字一致，不隨暱稱變動）
 ROLE_LABELS = {"a": "老婆", "b": "老公"}
 
+# 動態的分類標籤
+BLOG_CATEGORIES = {
+    "mood": "心情",
+    "recipe": "食譜",
+    "place": "想去的地方",
+    "daily": "小日常",
+}
+
 # 固定雙方地點（依需求直接寫死，不再開放編輯）
 LOCATIONS = {
     "a": {"city": "新竹", "timezone": "Asia/Taipei", "lat": 24.8138, "lon": 120.9675},
@@ -280,6 +288,7 @@ def init_db():
     ensure_column("blog_posts", "link_thumbnail", "TEXT")
     ensure_column("blog_posts", "link_domain", "TEXT")
     ensure_column("blog_posts", "link_is_youtube", "INTEGER")
+    ensure_column("blog_posts", "category", "TEXT")
     conn.commit()
 
     # 把進度條起點設成指定的日期（2026-07-26）。用一個遷移旗標確保這件事
@@ -1020,7 +1029,17 @@ def delete_memory(memory_id):
 @app.route("/blog")
 def blog():
     db = get_db()
-    raw_posts = run(db, "SELECT * FROM blog_posts ORDER BY id DESC").fetchall()
+    selected_category = request.args.get("category", "").strip()
+    if selected_category not in BLOG_CATEGORIES:
+        selected_category = ""  # 不合法或沒給 → 顯示全部
+
+    if selected_category:
+        raw_posts = run(
+            db, "SELECT * FROM blog_posts WHERE category = ? ORDER BY id DESC", (selected_category,)
+        ).fetchall()
+    else:
+        raw_posts = run(db, "SELECT * FROM blog_posts ORDER BY id DESC").fetchall()
+
     posts = []
     comments_by_post = {}
     for row in raw_posts:
@@ -1033,6 +1052,7 @@ def blog():
         is_youtube = bool(post.get("link_is_youtube")) or bool(post.get("youtube_url"))
         post["preview_is_youtube"] = is_youtube
         post["preview_domain"] = post.get("link_domain") or ("youtube.com" if is_youtube else None)
+        post["category_label"] = BLOG_CATEGORIES.get(post.get("category"))
         posts.append(post)
         comments_by_post[post["id"]] = run(
             db, "SELECT * FROM blog_comments WHERE post_id = ? ORDER BY id ASC", (post["id"],)
@@ -1042,6 +1062,8 @@ def blog():
         posts=posts,
         comments_by_post=comments_by_post,
         storage_enabled=SUPABASE_STORAGE_ENABLED,
+        blog_categories=BLOG_CATEGORIES,
+        selected_category=selected_category,
     )
 
 
@@ -1049,6 +1071,9 @@ def blog():
 def new_blog_post():
     content = request.form.get("content", "").strip()
     link_url = request.form.get("link_url", "").strip()
+    category = request.form.get("category", "").strip()
+    if category not in BLOG_CATEGORIES:
+        category = None
     file = request.files.get("image")
 
     image_url = None
@@ -1086,12 +1111,12 @@ def new_blog_post():
     cur = run(
         db,
         "INSERT INTO blog_posts "
-        "(sender_id, content, image_url, link_url, link_title, link_thumbnail, link_domain, link_is_youtube, created_at) "
-        "VALUES (?,?,?,?,?,?,?,?,?) RETURNING id",
+        "(sender_id, content, image_url, link_url, link_title, link_thumbnail, link_domain, link_is_youtube, category, created_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING id",
         (
             current_user_id(), content or None, image_url,
             link_url or None, link_title, link_thumbnail, link_domain,
-            1 if is_youtube else 0, now_str(),
+            1 if is_youtube else 0, category, now_str(),
         ),
     )
     new_id = cur.fetchone()["id"]
@@ -1106,6 +1131,22 @@ def new_blog_post():
         preview = "分享了一張照片"
     send_push_to_user(other_id(current_user_id()), f"{me['name']} 發了新動態", preview, "/blog")
 
+    return redirect(url_for("blog"))
+
+
+@app.route("/blog/edit/<int:post_id>", methods=["POST"])
+def edit_blog_post(post_id):
+    content = request.form.get("content", "").strip()
+    category = request.form.get("category", "").strip()
+    if category not in BLOG_CATEGORIES:
+        category = None
+    db = get_db()
+    run(
+        db,
+        "UPDATE blog_posts SET content = ?, category = ? WHERE id = ?",
+        (content or None, category, post_id),
+    )
+    db.commit()
     return redirect(url_for("blog"))
 
 
@@ -1131,6 +1172,24 @@ def add_blog_comment(post_id):
         db.commit()
         me = fetch_user(current_user_id())
         send_push_to_user(other_id(current_user_id()), f"{me['name']} 留言了", comment_text, "/blog")
+    return redirect(url_for("blog"))
+
+
+@app.route("/blog/comment/edit/<int:comment_id>", methods=["POST"])
+def edit_blog_comment(comment_id):
+    comment_text = request.form.get("comment_text", "").strip()
+    if comment_text:
+        db = get_db()
+        run(db, "UPDATE blog_comments SET comment_text = ? WHERE id = ?", (comment_text, comment_id))
+        db.commit()
+    return redirect(url_for("blog"))
+
+
+@app.route("/blog/comment/delete/<int:comment_id>", methods=["POST"])
+def delete_blog_comment(comment_id):
+    db = get_db()
+    run(db, "DELETE FROM blog_comments WHERE id = ?", (comment_id,))
+    db.commit()
     return redirect(url_for("blog"))
 
 
