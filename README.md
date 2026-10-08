@@ -1,4 +1,4 @@
-# 橘語 · 遠距情侶 App（Flask 示範版）
+# 晴話 · 遠距情侶 App（Flask 示範版）
 
 這是根據介面草稿實作的可執行網頁版原型，使用 Python + Flask，資料庫可選
 本機 SQLite 或 Supabase(Postgres)。在同一台電腦（或部署到雲端後）打開

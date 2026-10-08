@@ -10,7 +10,7 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let payload = { title: "橘語", body: "有新的消息", url: "/home" };
+  let payload = { title: "晴話", body: "有新的消息", url: "/home" };
   try {
     if (event.data) {
       payload = { ...payload, ...event.data.json() };
