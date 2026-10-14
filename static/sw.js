@@ -1,7 +1,7 @@
 // static/sw.js
 // 由 app.py 的 /sw.js 路由從網站根目錄提供，這樣才能控制整個網站（推播＋等待畫面）。
 
-const CACHE_NAME = "qinghua-loading-v1";
+const CACHE_NAME = "qinghua-loading-v2";
 const LOADING_URL = "/static/loading.html";
 // 頁面超過這麼久還沒回應，就先顯示等待畫面（Render 休眠時會卡幾十秒）。
 const SPLASH_DELAY_MS = 2000;
@@ -18,6 +18,9 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      // 換頁時讓瀏覽器一邊啟動 Service Worker、一邊直接向伺服器要頁面，
+      // 不用等 Service Worker 開機才發請求。少了這段等待，Android 換頁時就不會閃出載入進度條。
+      .then(() => self.registration.navigationPreload && self.registration.navigationPreload.enable())
       .then(() => self.clients.claim())
   );
 });
@@ -33,7 +36,7 @@ self.addEventListener("fetch", (event) => {
   if (req.mode !== "navigate" || req.method !== "GET") return;
   if (new URL(req.url).origin !== self.location.origin) return;
 
-  const network = fetch(req);
+  const network = Promise.resolve(event.preloadResponse).then((res) => res || fetch(req));
   if (Date.now() < awakeUntil) {
     event.respondWith(network);
     return;
