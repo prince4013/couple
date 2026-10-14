@@ -601,6 +601,21 @@ def index():
     return redirect(url_for("home"))
 
 
+@app.route("/healthz")
+def healthz():
+    # 等待畫面用來確認 Render 已經醒了，不碰資料庫，回應越快越好。
+    return jsonify({"ok": True})
+
+
+@app.route("/sw.js")
+def service_worker():
+    # Service Worker 要從根目錄提供，才能攔截整個網站的頁面、顯示等待畫面。
+    response = app.send_static_file("sw.js")
+    response.headers["Content-Type"] = "application/javascript"
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @app.route("/switch/<uid>")
 def switch(uid):
     if uid in ("a", "b"):

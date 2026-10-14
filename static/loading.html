@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#D85A30">
+<title>晴話 · 遠距情侶</title>
+<!-- 這頁由 Service Worker 存在手機裡，Render 休眠、伺服器還沒醒的時候先顯示。
+     不能引用任何外部檔案，因為那時候伺服器連不到。 -->
+<style>
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: #EADFCB;
+    font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center;
+  }
+  .sun {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: #FAC775; border: 4px solid #EF9F27; margin-bottom: 22px;
+    animation: bob 1.4s ease-in-out infinite;
+  }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+  h1 { margin: 0; font-size: 26px; font-weight: 700; color: #4A1B0C; letter-spacing: 4px; }
+  #note { margin: 6px 24px 18px; font-size: 14px; color: #993C1D; }
+  .dots span {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: #D85A30; margin: 0 3px; animation: fade 1.2s infinite;
+  }
+  .dots span:nth-child(2) { animation-delay: 0.2s; }
+  .dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes fade { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+  .place { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); left: 0; right: 0; font-size: 12px; color: #993C1D; }
+</style>
+</head>
+<body>
+  <div class="sun"></div>
+  <h1>晴話</h1>
+  <p id="note">正在連結愛的電波</p>
+  <div class="dots"><span></span><span></span><span></span></div>
+  <p class="place">Taiwan ⇄ Glasgow</p>
+<script>
+  setTimeout(function () {
+    document.getElementById("note").textContent = "喚起愛的伺服器需要點時間";
+  }, 4000);
+
+  // 一直問伺服器醒了沒，醒了就重新載入原本要去的頁面。
+  function check() {
+    fetch("/healthz", { cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("not ready");
+        // 告訴 Service Worker 伺服器已經醒了，重新載入時不要再擋一次。
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage("server-awake");
+        }
+        location.reload();
+      })
+      .catch(function () { setTimeout(check, 2000); });
+  }
+  check();
+</script>
+</body>
+</html>
